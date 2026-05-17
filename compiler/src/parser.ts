@@ -2,7 +2,9 @@ import { Token, TokenKind } from "./lexer";
 import { TokenStream, ParseError } from "./parser_base";
 import * as AST from "./ast";
 import { parseEntityDecl, parseCapabilityDecl } from "./parse_decls";
-import { parseChannelDecl, parseStoreDecl, parseEventDecl, parseConstraintDecl, parsePolicyDecl, parseFlowDecl, parseImportDecl, parseExtensionPointDecl } from "./parse_decls2";
+import { parseChannelDecl, parseStoreDecl, parseEventDecl, parseConstraintDecl, parsePolicyDecl, parseFlowDecl, parseImportDecl, parseExtensionPointDecl } from "./parse_infrastructure";
+import { parseModelDecl, parsePromptDecl, parseRouterDecl } from "./parse_cognition";
+import { parseEvaluationDecl } from "./parse_evaluation";
 
 export { ParseError } from "./parser_base";
 
@@ -57,6 +59,10 @@ export class Parser {
       case TokenKind.KwFlow: return parseFlowDecl(this.s);
       case TokenKind.KwImport: return parseImportDecl(this.s);
       case TokenKind.KwExtensionPoint: return parseExtensionPointDecl(this.s);
+      case TokenKind.KwModel: return parseModelDecl(this.s);
+      case TokenKind.KwPrompt: return parsePromptDecl(this.s);
+      case TokenKind.KwRouter: return parseRouterDecl(this.s);
+      case TokenKind.KwEvaluation: return parseEvaluationDecl(this.s);
       default:
         throw new ParseError("Expected declaration, got " + tok.kind, tok.loc);
     }

@@ -16,7 +16,8 @@ import {
   parseChannelDecl, parseStoreDecl, parseEventDecl,
   parseConstraintDecl, parsePolicyDecl, parseFlowDecl, parseImportDecl,
   parseExtensionPointDecl,
-} from "./parse_decls2";
+} from "./parse_infrastructure";
+import { parseModelDecl, parsePromptDecl, parseRouterDecl } from "./parse_cognition";
 
 export interface RecoveredParseResult {
   ast: AST.ProgramNode | null;
@@ -35,6 +36,10 @@ const SYNC_POINTS = new Set([
   TokenKind.KwFlow,
   TokenKind.KwImport,
   TokenKind.KwExtensionPoint,
+  // Cognition Layer (LLM Harness, Phase 1)
+  TokenKind.KwModel,
+  TokenKind.KwPrompt,
+  TokenKind.KwRouter,
   TokenKind.RBrace,
 ]);
 
@@ -146,6 +151,9 @@ export class RecoveringParser {
       case TokenKind.KwFlow: return parseFlowDecl(this.s);
       case TokenKind.KwImport: return parseImportDecl(this.s);
       case TokenKind.KwExtensionPoint: return parseExtensionPointDecl(this.s);
+      case TokenKind.KwModel: return parseModelDecl(this.s);
+      case TokenKind.KwPrompt: return parsePromptDecl(this.s);
+      case TokenKind.KwRouter: return parseRouterDecl(this.s);
       default:
         throw new ParseError(`Expected declaration, got ${tok.kind} ('${tok.value}')`, tok.loc);
     }
