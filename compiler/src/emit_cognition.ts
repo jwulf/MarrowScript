@@ -31,6 +31,7 @@ import { anyPromptUsesCache } from "./emit_cache";
 import { memoryNeeded } from "./emit_memory";
 import { emitOutputParser } from "./emit_output_parser";
 import { emitVersioning } from "./emit_versioning";
+import { emitStreaming } from "./emit_streaming";
 
 // ─── Public entry ────────────────────────────────────────────────────────────
 
@@ -89,6 +90,10 @@ export function emitCognitionFiles(system: IR.IRSystem): EmittedFile[] {
   // Prompt versioning & A/B testing (Phase 24) — shadow experiments, version tracking.
   const versioning = emitVersioning(system);
   if (versioning) files.push(versioning);
+
+  // Streaming runtime (Phase 25) — SSE, WebSocket, accumulator utilities.
+  const streaming = emitStreaming(system);
+  if (streaming) files.push(streaming);
 
   return files;
 }
