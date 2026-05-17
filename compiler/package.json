@@ -1,26 +1,18 @@
 {
-  "name": "bonescript-compiler",
+  "name": "marrowscript-compiler",
   "version": "0.8.1",
-  "description": "BoneScript compiler — compile .bone system descriptions into complete, runnable Node.js backends",
+  "private": true,
+  "description": "MarrowScript compiler — compile .marrow system descriptions into complete, runnable Node.js backends",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
   "bin": {
-    "bonec": "dist/cli.js"
+    "marrowc": "dist/cli.js"
   },
   "files": [
     "dist/**/*",
-    "!dist/test*.js",
-    "!dist/test*.js.map",
-    "!dist/test*.d.ts",
+    "!dist/tests/**",
     "src/**/*.ts",
-    "!src/test.ts",
-    "!src/test_typechecker.ts",
-    "!src/test_nakama.ts",
-    "!src/test_sqlite.ts",
-    "!src/test_notify.ts",
-    "!src/test_react.ts",
-    "!src/test_prisma.ts",
-    "!src/test_relations.ts",
+    "!src/tests/**",
     "LICENSE",
     "README.md"
   ],
@@ -29,10 +21,12 @@
     "prepare": "npm run build",
     "prepublishOnly": "npm run build",
     "start": "ts-node src/cli.ts",
-    "test": "ts-node src/test.ts && ts-node src/test_typechecker.ts && ts-node src/test_nakama.ts && ts-node src/test_sqlite.ts && ts-node src/test_notify.ts && ts-node src/test_react.ts && ts-node src/test_prisma.ts && ts-node src/test_relations.ts"
+    "test": "ts-node src/tests/test.ts && ts-node src/tests/test_typechecker.ts && ts-node src/tests/test_relations.ts && ts-node src/tests/targets/test_nakama.ts && ts-node src/tests/targets/test_sqlite.ts && ts-node src/tests/targets/test_notify.ts && ts-node src/tests/targets/test_react.ts && ts-node src/tests/targets/test_prisma.ts && ts-node src/tests/targets/test_sqlite_e2e.ts",
+    "test:cognition": "ts-node src/tests/cognition/test_cognition_parse.ts && ts-node src/tests/cognition/test_cognition_emit.ts && ts-node src/tests/cognition/test_cognition_e2e.ts && ts-node src/tests/cognition/test_cognition_phase3.ts && ts-node src/tests/cognition/test_cognition_phase4.ts && ts-node src/tests/cognition/test_cognition_phase5.ts && ts-node src/tests/cognition/test_cognition_phase6.ts && ts-node src/tests/cognition/test_cognition_phase7.ts && ts-node src/tests/cognition/test_cognition_phase8.ts && ts-node src/tests/cognition/test_cognition_phase9.ts && ts-node src/tests/cognition/test_cognition_phase10.ts && ts-node src/tests/cognition/test_cognition_phase14.ts && ts-node src/tests/cognition/test_cognition_phase15.ts && ts-node src/tests/cognition/test_cognition_phase16.ts && ts-node src/tests/cognition/test_cognition_phase17.ts && ts-node src/tests/cognition/test_cognition_phase18.ts && ts-node src/tests/cognition/test_cognition_phase19.ts && ts-node src/tests/cognition/test_cognition_phase19_v2.ts && ts-node src/tests/cognition/test_cognition_phase20.ts && ts-node src/tests/cognition/test_cognition_phase20_v2.ts && ts-node src/tests/cognition/test_cognition_phase21.ts && ts-node src/tests/cognition/test_cognition_phase22.ts",
+    "test:all": "npm test && npm run test:cognition"
   },
   "keywords": [
-    "bonescript",
+    "marrowscript",
     "compiler",
     "code-generation",
     "backend",
@@ -48,11 +42,11 @@
   },
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/Doorman11991/BoneScript.git"
+    "url": "git+https://github.com/Doorman11991/MarrowScript.git"
   },
-  "homepage": "https://github.com/Doorman11991/BoneScript#readme",
+  "homepage": "https://github.com/Doorman11991/MarrowScript#readme",
   "bugs": {
-    "url": "https://github.com/Doorman11991/BoneScript/issues"
+    "url": "https://github.com/Doorman11991/MarrowScript/issues"
   },
   "devDependencies": {
     "@types/node": "18.19.0",
