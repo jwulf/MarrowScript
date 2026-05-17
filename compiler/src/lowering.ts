@@ -12,10 +12,8 @@
 import { createHash } from "crypto";
 import * as AST from "./ast";
 import * as IR from "./ir";
-
-function toSnakeCase(s: string): string {
-  return s.replace(/([a-z])([A-Z])/g, "$1_$2").toLowerCase();
-}
+import { lookupPromptbookEntry, renderPromptbookTemplate } from "./promptbook";
+import { toSnakeCase } from "./utils";
 
 // ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ Deterministic ID Generation ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬
 
@@ -107,6 +105,12 @@ export class Lowering {
     const policies = sys.declarations.filter((d): d is AST.PolicyDeclNode => d.kind === "PolicyDecl");
     const flowDecls = sys.declarations.filter((d): d is AST.FlowDeclNode => d.kind === "FlowDecl");
     const extensionPoints = sys.declarations.filter((d): d is AST.ExtensionPointDeclNode => d.kind === "ExtensionPointDecl");
+    // Cognition Layer (LLM Harness, Phase 1): collect new top-level decls.
+    const modelDecls = sys.declarations.filter((d): d is AST.ModelDeclNode => d.kind === "ModelDecl");
+    const promptDecls = sys.declarations.filter((d): d is AST.PromptDeclNode => d.kind === "PromptDecl");
+    const routerDecls = sys.declarations.filter((d): d is AST.RouterDeclNode => d.kind === "RouterDecl");
+    // Phase 16: evaluation decls — typed regression tests for prompts.
+    const evaluationDecls = sys.declarations.filter((d): d is AST.EvaluationDeclNode => d.kind === "EvaluationDecl");
 
     // Lower stores ÃƒÂ¢Ã¢â‚¬Â Ã¢â‚¬â„¢ data_store modules
     for (const store of stores) {
@@ -189,7 +193,100 @@ export class Lowering {
         returns: ep.returns ? serializeType(ep.returns) : null,
         stable: ep.stable,
       })),
+      models: modelDecls.map(m => this.lowerModel(m)),
+      prompts: promptDecls.map(p => this.lowerPrompt(p)),
+      routers: routerDecls.map(r => this.lowerRouter(r)),
+      // Phase 15: collect cognition-bearing capabilities referenced from
+      // any prompt's allowed_tools. Cognition-only capabilities (no
+      // entity-typed param) wouldn't otherwise show up in modules at all.
+      tool_capabilities: this.collectToolCapabilities(promptDecls, capabilities),
+      // Phase 16: typed regression tests for prompts. Lowered straight from
+      // AST since they have no runtime presence — they're consumed by
+      // emit_evaluation.ts and the marrowc evaluate CLI.
+      evaluations: evaluationDecls.map(e => this.lowerEvaluation(e)),
+      // Phase 21: collect cost budgets across all policies. Each policy may
+      // declare any number of budgets; the runtime emitter walks the merged
+      // list once.
+      cost_budgets: this.collectCostBudgets(policies),
     };
+  }
+
+  /**
+   * Phase 15: build the IR-level descriptor for every cognition-bearing
+   * capability listed in some prompt's allowed_tools. The type checker (T029)
+   * already enforces that each tool capability has cognition: <primitive>;
+   * here we just translate that AST shape into IR for the cognition emitter.
+   */
+  private collectToolCapabilities(
+    prompts: AST.PromptDeclNode[],
+    capabilities: AST.CapabilityDeclNode[],
+  ): IR.IRToolCapability[] {
+    const referenced = new Set<string>();
+    for (const p of prompts) {
+      for (const t of p.allowedTools) referenced.add(t);
+    }
+    const byName = new Map<string, AST.CapabilityDeclNode>();
+    for (const c of capabilities) byName.set(c.name, c);
+    const out: IR.IRToolCapability[] = [];
+    // Iterate the referenced set in alphabetical order so the IR is stable
+    // regardless of source-order — the dispatch table emitter relies on this
+    // for bitwise-identical re-runs.
+    const names = [...referenced].sort();
+    for (const name of names) {
+      const cap = byName.get(name);
+      if (!cap || !cap.cognition) continue; // T029 already errored
+      out.push({
+        name: cap.name,
+        params: cap.params.map(p => ({
+          name: p.name,
+          type: serializeType(p.type),
+          nullable: false,
+          unique: false,
+          indexed: false,
+          default_value: null,
+        })),
+        cognition_primitive: cap.cognition.name,
+        bindings: cap.cognition.using.map(b => ({
+          param: b.param,
+          value: serializeExpr(b.value),
+        })),
+        return_type: cap.returns ? serializeType(cap.returns) : "string",
+      });
+    }
+    return out;
+  }
+
+  /**
+   * Phase 21: collect every cost-budget across all policies. Each budget gets
+   * a stable id derived from its identity (policy/scope/feature/window/cap).
+   * The runtime emitter walks this list once to generate counter tables and
+   * the assertWithinBudget helper.
+   */
+  private collectCostBudgets(policies: AST.PolicyDeclNode[]): IR.IRCostBudget[] {
+    const out: IR.IRCostBudget[] = [];
+    for (const policy of policies) {
+      for (let i = 0; i < policy.costBudgets.length; i++) {
+        const b = policy.costBudgets[i];
+        // Stable id: policy + scope + feature + window. Index suffix
+        // disambiguates two budgets on the same scope+window with different caps.
+        const idParts = [policy.name, b.scope, b.feature ?? "", b.window, String(i)];
+        const id = idParts.join(":");
+        out.push({
+          id,
+          policy: policy.name,
+          scope: b.scope,
+          feature: b.feature,
+          window_ms: parseDurationMs(b.window) || 60_000,
+          cap_usd: b.capUsd,
+          cap_tokens: b.capTokens,
+          cap_calls: b.capCalls,
+          action: b.action,
+          retry_after_ms: b.retryAfter ? parseDurationMs(b.retryAfter) : null,
+          error_code: b.errorCode,
+        });
+      }
+    }
+    return out;
   }
 
   // ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ Store Lowering ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬
@@ -436,6 +533,7 @@ export class Lowering {
       retry: null,
       pipeline: null,
       algorithm: null,
+      cognition: null,
       sync: null,
     };
   }
@@ -468,11 +566,42 @@ export class Lowering {
     if (cap.pipeline) {
       pipeline = {
         parallel: cap.pipeline.parallel,
-        steps: cap.pipeline.steps.map(step => ({
-          call_name: step.call.name,
-          call_args: step.call.args.map(a => serializeExpr(a)),
-          bind_as: step.bindAs,
-        })),
+        steps: cap.pipeline.steps.map(step => {
+          if (step.kind === "PipelineMatch") {
+            // Phase 11: lower a runtime match dispatch.
+            const m: IR.IRPipelineMatch = {
+              kind: "match",
+              key_expr: serializeExpr(step.key),
+              cases: step.cases.map(c => ({
+                literal: c.literal,
+                literal_kind: c.literalKind,
+                arm: {
+                  kind: "step",
+                  call_name: c.arm.call.name,
+                  call_args: c.arm.call.args.map(a => serializeExpr(a)),
+                  bind_as: c.arm.bindAs,
+                },
+              })),
+              default_arm: step.defaultArm
+                ? {
+                    kind: "step",
+                    call_name: step.defaultArm.call.name,
+                    call_args: step.defaultArm.call.args.map(a => serializeExpr(a)),
+                    bind_as: step.defaultArm.bindAs,
+                  }
+                : null,
+            };
+            return m;
+          }
+          // Plain step.
+          const s: IR.IRPipelineStep = {
+            kind: "step",
+            call_name: step.call.name,
+            call_args: step.call.args.map(a => serializeExpr(a)),
+            bind_as: step.bindAs,
+          };
+          return s;
+        }),
         on_error: cap.pipeline.onError ? {
           action: cap.pipeline.onError.action,
           call_name: cap.pipeline.onError.call?.name || null,
@@ -487,6 +616,20 @@ export class Lowering {
       algorithm = {
         catalog_name: cap.algorithm.name,
         bindings: cap.algorithm.using.map(b => ({
+          param: b.param,
+          value: serializeExpr(b.value),
+        })),
+      };
+    }
+
+    // Lower cognition binding if present (LLM Harness, Phase 1).
+    // Mirrors algorithm lowering — the cognition catalog is closed and
+    // resolved by emit_cognition.ts in Phase 2.
+    let cognition: IR.IRCognitionBinding | null = null;
+    if (cap.cognition) {
+      cognition = {
+        catalog_name: cap.cognition.name,
+        bindings: cap.cognition.using.map(b => ({
           param: b.param,
           value: serializeExpr(b.value),
         })),
@@ -510,6 +653,7 @@ export class Lowering {
       } : null,
       pipeline,
       algorithm,
+      cognition,
       sync: cap.sync,
     };
   }
@@ -524,9 +668,9 @@ export class Lowering {
       interfaces: [{
         name: `I${channel.name}Channel`,
         methods: [
-          { name: "connect", input: [], output: "connection", preconditions: [], effects: [], emissions: [], idempotent: false, authenticated: true, timeout_ms: 5000, retry: null, pipeline: null, algorithm: null, sync: null },
-          { name: "subscribe", input: [{ name: "topic", type: "string", nullable: false, unique: false, indexed: false, default_value: null }], output: "subscription", preconditions: [], effects: [], emissions: [], idempotent: true, authenticated: true, timeout_ms: 5000, retry: null, pipeline: null, algorithm: null, sync: null },
-          { name: "publish", input: [{ name: "message", type: "json", nullable: false, unique: false, indexed: false, default_value: null }], output: "void", preconditions: [], effects: [], emissions: [], idempotent: false, authenticated: true, timeout_ms: 5000, retry: null, pipeline: null, algorithm: null, sync: null },
+          { name: "connect", input: [], output: "connection", preconditions: [], effects: [], emissions: [], idempotent: false, authenticated: true, timeout_ms: 5000, retry: null, pipeline: null, algorithm: null, cognition: null, sync: null },
+          { name: "subscribe", input: [{ name: "topic", type: "string", nullable: false, unique: false, indexed: false, default_value: null }], output: "subscription", preconditions: [], effects: [], emissions: [], idempotent: true, authenticated: true, timeout_ms: 5000, retry: null, pipeline: null, algorithm: null, cognition: null, sync: null },
+          { name: "publish", input: [{ name: "message", type: "json", nullable: false, unique: false, indexed: false, default_value: null }], output: "void", preconditions: [], effects: [], emissions: [], idempotent: false, authenticated: true, timeout_ms: 5000, retry: null, pipeline: null, algorithm: null, cognition: null, sync: null },
         ],
       }],
       models: [],
@@ -566,6 +710,17 @@ export class Lowering {
         name: s.name,
         action: `${s.action.name}(${s.action.args.map(serializeExpr).join(", ")})`,
         compensation: s.compensate ? `${s.compensate.name}(${s.compensate.args.map(serializeExpr).join(", ")})` : null,
+        // Phase 17: lower the optional checkpoint clause. Show-expressions
+        // are serialised the same way as constraints (string-shaped) so the
+        // emitter can either embed them as JSON paths or surface them via
+        // ctx lookups.
+        checkpoint: s.checkpoint ? {
+          name: s.checkpoint.name,
+          shows: s.checkpoint.shows.map(serializeExpr),
+          allow: [...s.checkpoint.allow],
+          timeout_ms: parseDurationMs(s.checkpoint.timeout),
+          on_timeout: s.checkpoint.onTimeout,
+        } : null,
       })),
     };
   }
@@ -583,5 +738,200 @@ export class Lowering {
       renamed_from: f.renamedFrom ?? null,
       sensitive: f.sensitive ?? false,
     };
+  }
+
+  // ─── Cognition Layer Lowering (LLM Harness, Phase 1) ───────────────────────
+  // Defaults are deliberate and chosen to produce safe, low-cost behavior:
+  //   - temperature defaults to 0.0 (deterministic-friendly)
+  //   - validate defaults to none (Phase 2 emit_cognition.ts will use the
+  //     prompt's `returns:` type to derive a Zod schema when validate=schema_only)
+  //   - on_invalid defaults to fail (no silent retry loops)
+  //   - cost/latency classes default to "small"/"medium" (most local models)
+
+  private lowerModel(m: AST.ModelDeclNode): IR.IRCogModel {
+    if (m.provider === null) {
+      throw new Error(`Model '${m.name}' is missing required 'provider' field`);
+    }
+    if (m.modelName === null) {
+      throw new Error(`Model '${m.name}' is missing required 'name' field (the provider-specific model identifier)`);
+    }
+    return {
+      id: makeId(this.systemName, "model", m.name),
+      name: m.name,
+      provider: m.provider as IR.IRProviderKind,
+      model_name: m.modelName,
+      endpoint: m.endpoint,
+      context_window: m.contextWindow ?? 4096,
+      max_output: m.maxOutput ?? 1024,
+      temperature: m.temperature ?? 0.0,
+      top_p: m.topP,
+      stop: m.stop ?? [],
+      cost_class: (m.costClass ?? "small") as IR.IRCostClass,
+      latency_class: (m.latencyClass ?? "medium") as IR.IRLatencyClass,
+      vram_mb: m.vramMb,
+      quant: m.quant,
+    };
+  }
+
+  private lowerPrompt(p: AST.PromptDeclNode): IR.IRPrompt {
+    // Phase 18: when promptbook is referenced, render the entry's baseline
+    // template at compile time using the user's `with:` args. The lowered
+    // shape is then identical to a plain `template:` prompt — no runtime
+    // dependency on the promptbook module. The renderer leaves
+    // `{{__input.<name>}}` placeholders intact so the cognition emitter
+    // can substitute them with prompt-call inputs.
+    let resolvedTemplate = p.template;
+    if (p.promptbookRef) {
+      const entry = lookupPromptbookEntry(p.promptbookRef);
+      if (!entry) {
+        throw new Error(`Prompt '${p.name}' references unknown promptbook entry '${p.promptbookRef}'`);
+      }
+      // Coerce arg values to literals. Expression values are best-effort —
+      // simple literals are extracted; anything else surfaces as an error.
+      const args: Record<string, string | number | string[]> = {};
+      for (const a of p.promptbookArgs) {
+        const v = a.value;
+        if (v.kind === "Literal") {
+          if (v.type === "list") {
+            args[a.name] = (v.value as AST.ExprNode[]).map(item => {
+              if (item.kind === "Literal" && item.type === "string") return String(item.value);
+              return serializeExpr(item);
+            });
+          } else {
+            args[a.name] = v.value as string | number;
+          }
+        } else {
+          // Non-literal: serialise as a string so the user's intent (e.g.
+          // referencing another decl) survives as a debuggable artifact.
+          args[a.name] = serializeExpr(v);
+        }
+      }
+      resolvedTemplate = renderPromptbookTemplate(entry, args);
+    }
+    if (resolvedTemplate === null) {
+      throw new Error(`Prompt '${p.name}' is missing required 'template' or 'promptbook' field`);
+    }
+    if (p.modelRef === null && p.routerRef === null) {
+      throw new Error(`Prompt '${p.name}' must reference either a model or a router`);
+    }
+    if (p.modelRef !== null && p.routerRef !== null) {
+      throw new Error(`Prompt '${p.name}' cannot reference both a model and a router (choose one)`);
+    }
+
+    const validate: IR.IRValidateMode =
+      p.validate.kind === "custom"
+        ? { kind: "custom", extension_point: p.validate.extensionPoint }
+        : { kind: p.validate.kind };
+
+    const cache: IR.IRPromptCache | null = p.cache
+      ? {
+          key_expr: p.cache.keyExpr ? serializeExpr(p.cache.keyExpr) : "",
+          ttl_ms: parseDurationMs(p.cache.ttl) ?? 3_600_000,
+        }
+      : null;
+
+    const input: IR.IRField[] = p.params.map(param => ({
+      name: param.name,
+      type: serializeType(param.type),
+      nullable: false,
+      unique: false,
+      indexed: false,
+      default_value: null,
+    }));
+
+    return {
+      id: makeId(this.systemName, "prompt", p.name),
+      name: p.name,
+      input,
+      output_type: p.returns ? serializeType(p.returns) : "json",
+      model_ref: p.modelRef,
+      router_ref: p.routerRef,
+      template: resolvedTemplate,
+      validate,
+      on_invalid: p.onInvalid,
+      retry: p.retry
+        ? {
+            max_attempts: p.retry.maxAttempts ?? 3,
+            backoff: (p.retry.backoff as IR.IRRetryPolicy["backoff"]) ?? "exponential",
+            interval_ms: parseDurationMs(p.retry.interval) ?? 1000,
+          }
+        : null,
+      timeout_ms: parseDurationMs(p.timeout) ?? 30_000,
+      cache,
+      idempotent: p.idempotent ?? false,
+      constraints: p.constraints.map(c => serializeExpr(c)),
+      allowed_tools: [...p.allowedTools],
+    };
+  }
+
+  private lowerRouter(r: AST.RouterDeclNode): IR.IRRouter {
+    if (r.byExpr === null) {
+      throw new Error(`Router '${r.name}' is missing required 'by:' expression`);
+    }
+    return {
+      id: makeId(this.systemName, "router", r.name),
+      name: r.name,
+      by_expr: serializeExpr(r.byExpr),
+      tiers: r.tiers.map(t => ({
+        name: t.name,
+        max: t.max,
+        model_ref: t.modelRef,
+      })),
+      on_low_confidence: r.onLowConfidence,
+      confidence_threshold: r.confidenceThreshold ?? 0.0,
+      fallback_model_ref: r.fallbackModel,
+      // Phase 19: observed metrics + policy. The runtime emitter uses these
+      // to wire metrics counters per call. The tuner CLI (offline / future)
+      // reads recorded metrics to recompute tier thresholds.
+      observe: [...r.observe],
+      policy: r.policy
+        ? {
+            objective: r.policy.objective,
+            constraints: r.policy.constraints.map(serializeExpr),
+          }
+        : null,
+    };
+  }
+
+  /**
+   * Phase 16: lower an evaluation decl. Cases preserve declaration order so
+   * the runner produces deterministic per-case output. Expectations are
+   * lowered to a closed IR union for simple emitter dispatch.
+   */
+  private lowerEvaluation(e: AST.EvaluationDeclNode): IR.IREvaluation {
+    return {
+      id: makeId(this.systemName, "evaluation", e.name),
+      name: e.name,
+      prompt_ref: e.promptRef,
+      cases: e.cases.map(c => ({
+        name: c.caseName,
+        input: c.input.map(b => ({ param: b.param, value: serializeExpr(b.value) })),
+        expectations: c.expectations.map(exp => this.lowerEvaluationExpectation(exp)),
+      })),
+      metric: e.metric?.metric ?? "pass_rate",
+      min_pass_rate: e.baseline?.minPassRate ?? 0,
+      schedule_on: e.schedule?.on ?? [],
+    };
+  }
+
+  private lowerEvaluationExpectation(exp: AST.EvaluationExpectationNode): IR.IREvaluationExpectation {
+    switch (exp.kind) {
+      case "ExpPasses":
+        return { kind: "passes", mode: exp.mode };
+      case "ExpContainsClassNamed":
+        return { kind: "contains_class_named", pattern: exp.pattern };
+      case "ExpMustContainString":
+        return { kind: "must_contain_string", values: exp.values };
+      case "ExpMustNotContainString":
+        return { kind: "must_not_contain_string", values: exp.values };
+      case "ExpImportsOnlyFrom":
+        return { kind: "imports_only_from", allowed: exp.allowed };
+      case "ExpMaxLines":
+        return { kind: "max_lines", value: exp.value };
+      case "ExpMinLines":
+        return { kind: "min_lines", value: exp.value };
+      case "ExpLatencyUnderMs":
+        return { kind: "latency_under_ms", value: exp.value };
+    }
   }
 }
