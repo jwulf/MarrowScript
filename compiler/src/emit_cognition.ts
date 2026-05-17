@@ -32,6 +32,7 @@ import { memoryNeeded } from "./emit_memory";
 import { emitOutputParser } from "./emit_output_parser";
 import { emitVersioning } from "./emit_versioning";
 import { emitStreaming } from "./emit_streaming";
+import { emitLoops } from "./emit_loops";
 
 // ─── Public entry ────────────────────────────────────────────────────────────
 
@@ -94,6 +95,10 @@ export function emitCognitionFiles(system: IR.IRSystem): EmittedFile[] {
   // Streaming runtime (Phase 25) — SSE, WebSocket, accumulator utilities.
   const streaming = emitStreaming(system);
   if (streaming) files.push(streaming);
+
+  // Bounded agent loops (Phase 26) — iterative refinement patterns.
+  const loops = emitLoops(system);
+  if (loops) files.push(loops);
 
   return files;
 }
