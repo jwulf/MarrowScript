@@ -410,6 +410,9 @@ function emitPromptsFile(system: IR.IRSystem): string {
   }
   lines.push("import { createHash } from \"crypto\";");
 
+  // Phase 23: structured output parser
+  lines.push("import { parseStructuredOutput, parseForPrompt, type ParseResult } from \"./output_parser\";");
+
   if (system.routers.length > 0) {
     lines.push("import { getRouter, type CompiledRouter, type RouteChoice } from \"./router\";");
   }
@@ -936,7 +939,15 @@ function emitPromptCaller(p: IR.IRPrompt, lines: string[], system: IR.IRSystem):
     lines.push(`      }, __controller.signal);`);
   }
   lines.push(`      clearTimeout(__timer);`);
-  lines.push(`      const __value = parseModelOutput(__resp.content, ${JSON.stringify(expected)});`);
+  // Phase 23: use structured output parser for JSON modes
+  if (expected === "json" || expected === "file" || expected === "files") {
+    lines.push(`      const __parseResult = parseForPrompt(${JSON.stringify(p.name)}, __resp.content);`);
+    lines.push(`      const __value = __parseResult.success ? __parseResult.data : parseModelOutput(__resp.content, ${JSON.stringify(expected)});`);
+    lines.push(`      const __parseStrategy = __parseResult.strategy;`);
+  } else {
+    lines.push(`      const __value = parseModelOutput(__resp.content, ${JSON.stringify(expected)});`);
+    lines.push(`      const __parseStrategy = "string_direct";`);
+  }
 
   // Phase 7: low-confidence check (only when prompt routes through a router).
   // The router's confidence_threshold + on_low_confidence determines whether
