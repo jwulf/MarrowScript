@@ -34,6 +34,7 @@ import { emitVersioning } from "./emit_versioning";
 import { emitStreaming } from "./emit_streaming";
 import { emitLoops } from "./emit_loops";
 import { emitTraceViewer } from "./emit_trace_viewer";
+import { emitSemanticCache } from "./emit_semantic_cache";
 
 // ─── Public entry ────────────────────────────────────────────────────────────
 
@@ -104,6 +105,10 @@ export function emitCognitionFiles(system: IR.IRSystem): EmittedFile[] {
   // Trace viewer CLI (Phase 27) — query and display cognition traces.
   const traceViewer = emitTraceViewer(system);
   if (traceViewer) files.push(traceViewer);
+
+  // Semantic cache (Phase 29) — similarity-aware prompt caching.
+  const semanticCache = emitSemanticCache(system);
+  if (semanticCache) files.push(semanticCache);
 
   return files;
 }
