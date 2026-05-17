@@ -260,6 +260,10 @@ export function parsePromptDecl(s: TokenStream): AST.PromptDeclNode {
     allowedTools: [],
     promptbookRef: null,
     promptbookArgs: [],
+    stream: false,
+    version: null,
+    shadow: null,
+    loop: null,
   };
 
   while (!s.check(TokenKind.RBrace) && !s.check(TokenKind.EOF)) {
@@ -340,6 +344,57 @@ export function parsePromptDecl(s: TokenStream): AST.PromptDeclNode {
           const argValue = parseExpr(s);
           node.promptbookArgs.push({ name: argName, value: argValue });
           s.match(TokenKind.Comma); // optional separator
+        }
+        s.expect(TokenKind.RBrace, "}");
+        break;
+      // Phase 24-26: new prompt modifiers
+      case TokenKind.KwStream:
+        s.advance(); s.expect(TokenKind.Colon, ":");
+        node.stream = s.advance().kind === TokenKind.KwTrue;
+        break;
+      case TokenKind.KwVersion:
+        s.advance(); s.expect(TokenKind.Colon, ":");
+        node.version = parseInt(s.advance().value, 10);
+        break;
+      case TokenKind.KwShadow:
+        s.advance(); s.expect(TokenKind.Colon, ":");
+        s.expect(TokenKind.LBrace, "{");
+        node.shadow = { version: 0, traffic: 0 };
+        while (!s.check(TokenKind.RBrace) && !s.check(TokenKind.EOF)) {
+          const field = s.advance();
+          s.expect(TokenKind.Colon, ":");
+          const val = parseInt(s.advance().value, 10);
+          if (field.value === "version") node.shadow.version = val;
+          else if (field.value === "traffic") node.shadow.traffic = val;
+          s.match(TokenKind.Comma);
+        }
+        s.expect(TokenKind.RBrace, "}");
+        break;
+      case TokenKind.KwLoop:
+        s.advance(); s.expect(TokenKind.Colon, ":");
+        s.expect(TokenKind.LBrace, "{");
+        node.loop = { steps: [], until: "schema_only", max_iterations: 3 };
+        while (!s.check(TokenKind.RBrace) && !s.check(TokenKind.EOF)) {
+          const field = s.peek();
+          if (field.kind === TokenKind.KwUntil) {
+            s.advance(); s.expect(TokenKind.Colon, ":");
+            node.loop.until = s.advance().value;
+          } else if (field.kind === TokenKind.KwMax || field.value === "max_iterations") {
+            s.advance(); s.expect(TokenKind.Colon, ":");
+            node.loop.max_iterations = parseInt(s.advance().value, 10);
+          } else if (field.kind === TokenKind.Identifier) {
+            // Step name: step_name(args) as alias
+            node.loop.steps.push(s.advance().value);
+            // Skip the rest of the step declaration until next field or }
+            while (!s.check(TokenKind.RBrace) && !s.check(TokenKind.KwUntil) &&
+                   !(s.peek().kind === TokenKind.Identifier && s.peek(1)?.kind === TokenKind.LParen) &&
+                   !s.check(TokenKind.EOF)) {
+              s.advance();
+            }
+          } else {
+            s.advance(); // skip unknown
+          }
+          s.match(TokenKind.Comma);
         }
         s.expect(TokenKind.RBrace, "}");
         break;

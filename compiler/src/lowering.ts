@@ -861,6 +861,10 @@ export class Lowering {
       idempotent: p.idempotent ?? false,
       constraints: p.constraints.map(c => serializeExpr(c)),
       allowed_tools: [...p.allowedTools],
+      stream: p.stream || false,
+      version: p.version ?? null,
+      shadow: p.shadow ?? null,
+      loop: p.loop ? { max_iterations: p.loop.max_iterations, until: p.loop.until, steps: p.loop.steps } : null,
     };
   }
 
