@@ -30,6 +30,7 @@ import { CATALOG, lookupCognition } from "./cognition_catalog";
 import { anyPromptUsesCache } from "./emit_cache";
 import { memoryNeeded } from "./emit_memory";
 import { emitOutputParser } from "./emit_output_parser";
+import { emitVersioning } from "./emit_versioning";
 
 // ─── Public entry ────────────────────────────────────────────────────────────
 
@@ -84,6 +85,10 @@ export function emitCognitionFiles(system: IR.IRSystem): EmittedFile[] {
   // Structured output parser (Phase 23) — robust JSON extraction + Zod validation.
   const outputParser = emitOutputParser(system);
   if (outputParser) files.push(outputParser);
+
+  // Prompt versioning & A/B testing (Phase 24) — shadow experiments, version tracking.
+  const versioning = emitVersioning(system);
+  if (versioning) files.push(versioning);
 
   return files;
 }
