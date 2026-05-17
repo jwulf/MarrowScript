@@ -33,6 +33,7 @@ import { emitOutputParser } from "./emit_output_parser";
 import { emitVersioning } from "./emit_versioning";
 import { emitStreaming } from "./emit_streaming";
 import { emitLoops } from "./emit_loops";
+import { emitTraceViewer } from "./emit_trace_viewer";
 
 // ─── Public entry ────────────────────────────────────────────────────────────
 
@@ -99,6 +100,10 @@ export function emitCognitionFiles(system: IR.IRSystem): EmittedFile[] {
   // Bounded agent loops (Phase 26) — iterative refinement patterns.
   const loops = emitLoops(system);
   if (loops) files.push(loops);
+
+  // Trace viewer CLI (Phase 27) — query and display cognition traces.
+  const traceViewer = emitTraceViewer(system);
+  if (traceViewer) files.push(traceViewer);
 
   return files;
 }
