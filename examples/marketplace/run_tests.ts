@@ -7,7 +7,7 @@ import * as jwt from "jsonwebtoken";
 import * as http from "http";
 
 const BASE_URL = "http://localhost:3000";
-const JWT_SECRET = "bonescript-dev-secret-change-in-production";
+const JWT_SECRET = "marrowscript-dev-secret-change-in-production";
 
 // Generate a test JWT
 const token = jwt.sign({ sub: "test-user-id", role: "admin" }, JWT_SECRET, { expiresIn: "1h" });

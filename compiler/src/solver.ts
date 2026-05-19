@@ -1,5 +1,5 @@
 /**
- * BoneScript Constraint Solver â€” Stage 5 of the compilation pipeline.
+ * MarrowScript Constraint Solver â€” Stage 5 of the compilation pipeline.
  * Implements spec/06_CONSTRAINT_SOLVER.md.
  *
  * Resolves all underspecified aspects of the IR into concrete decisions.

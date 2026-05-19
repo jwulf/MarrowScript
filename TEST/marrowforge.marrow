@@ -1,0 +1,775 @@
+// ─────────────────────────────────────────────────────────────────────────────
+// MarrowForge — an intelligent code & architecture forge powered by MarrowScript
+// ─────────────────────────────────────────────────────────────────────────────
+//
+// MarrowForge takes vague ideas, feature requests, bug reports, or messy code
+// snippets and turns them into clean, production-ready code artifacts with
+// full traceability. Built on MarrowScript's LLM Harness, so:
+//
+//   - The compiler is bitwise deterministic. Same .marrow → same output tree.
+//   - Two real LLMs are wired in:
+//       * Tiny    — LM Studio: huihui-gemma-4-e4b-it-abliterated (~4B params)
+//       * Medium  — OpenRouter: deepseek/deepseek-v4-flash:free
+//   - The router picks the cheap model first; on low confidence (< 0.6) it
+//     escalates to Medium. Same input → same tier choice.
+//   - Validation is structural: schema_only for analysis, ast_compiles for
+//     generated artifacts. Bad output triggers a bounded single-shot repair.
+//   - Every prompt call writes a span to cognition_traces. `marrowc replay
+//     <trace_id>` reproduces an incident.
+//   - Caching, budget gauges, audit-log redaction, and Express runtime are
+//     all inherited from the existing emitters — zero extra wiring.
+//
+// Compile with:
+//   marrowc compile marrowforge.marrow
+//
+// Then fill in the two extension_point bodies at the bottom of this file
+// (recommended starter content is shown in TEST/extensions_starter.ts).
+// ─────────────────────────────────────────────────────────────────────────────
+
+system MarrowForge {
+  domain: cognitive_scaffold
+
+  // ─── Entities ──────────────────────────────────────────────────────────────
+  //
+  // ForgeRequest is the input — a free-text description plus a hint at what
+  // kind of artifact the user wants. ForgeResult is the output of one forge
+  // run. The state machine on ForgeResult lets the runtime reflect progress
+  // back to the caller without coupling the workflow to a specific transport.
+
+  entity ForgeRequest {
+    owns: [
+      title: string,
+      description: string,
+      desired_kind: string,
+      target_path: string,
+      complexity: float
+    ]
+    constraints: [
+      complexity >= 0.0,
+      complexity <= 1.0,
+      desired_kind in [
+        "component",
+        "endpoint",
+        "schema",
+        "refactor",
+        "diagram",
+        "full_feature",
+        "test"
+      ]
+    ]
+  }
+
+  entity ForgeResult {
+    owns: [
+      request_id: uuid,
+      kind: string,
+      summary: string,
+      target_path: string,
+      target_symbol: string,
+      artifact: string,
+      plan: string,
+      confidence: float,
+      ast_compiles: bool,
+      tier_used: string,
+      trace_id: string
+    ]
+    constraints: [
+      confidence >= 0.0,
+      confidence <= 1.0
+    ]
+    states: pending -> analyzed -> sliced -> generated -> saved | failed
+  }
+
+  // ─── RepoForgeRequest: 2-repo ingestion variant (Phase 9 + Phase 12) ─────
+  //
+  // Same shape as ForgeRequest but with two GitHub URLs and a preset that
+  // tells the forge HOW to combine the two repos. The preset is constraint-
+  // checked at the API boundary, so the analyzer + generator can branch on
+  // it without worrying about typos.
+  //
+  // Presets:
+  //   compat_layer  build a compatibility layer between A and B
+  //   combine       merge A and B into a new unified module
+  //   bridge        wire A's events into B's handlers
+  //   port_a_to_b   reimplement A's surface in B's idioms
+  //   port_b_to_a   reverse direction
+  //   extract       pull a specific subsystem from A and graft into B
+  //   compare_apis  produce a diff / diagram, no codegen
+
+  entity RepoForgeRequest {
+    owns: [
+      title: string,
+      description: string,
+      preset: string,
+      repo_a_url: string,
+      repo_b_url: string,
+      repo_a_ref: string,
+      repo_b_ref: string,
+      target_path: string,
+      complexity: float
+    ]
+    constraints: [
+      complexity >= 0.0,
+      complexity <= 1.0,
+      preset in [
+        "compat_layer",
+        "combine",
+        "bridge",
+        "port_a_to_b",
+        "port_b_to_a",
+        "extract",
+        "compare_apis"
+      ]
+    ]
+  }
+
+  // ─── Stores ────────────────────────────────────────────────────────────────
+  //
+  // Postgres is the source of truth. The transactional outbox + audit-log
+  // tables that ship with every MarrowScript project apply here for free.
+
+  store ForgeRequestStore {
+    engine: postgresql
+    schema: {
+      id: uuid,
+      title: string,
+      description: string,
+      desired_kind: string,
+      target_path: string,
+      complexity: float,
+      created_at: timestamp,
+      updated_at: timestamp
+    }
+  }
+
+  store ForgeResultStore {
+    engine: postgresql
+    schema: {
+      id: uuid,
+      request_id: uuid,
+      kind: string,
+      summary: string,
+      target_path: string,
+      target_symbol: string,
+      artifact: string,
+      plan: string,
+      confidence: float,
+      ast_compiles: bool,
+      tier_used: string,
+      trace_id: string,
+      created_at: timestamp,
+      updated_at: timestamp
+    }
+  }
+
+  store RepoForgeRequestStore {
+    engine: postgresql
+    schema: {
+      id: uuid,
+      title: string,
+      description: string,
+      preset: string,
+      repo_a_url: string,
+      repo_b_url: string,
+      repo_a_ref: string,
+      repo_b_ref: string,
+      target_path: string,
+      complexity: float,
+      created_at: timestamp,
+      updated_at: timestamp
+    }
+  }
+
+  // ─── Events ────────────────────────────────────────────────────────────────
+  //
+  // The transactional outbox guarantees at-least-once delivery — consumers
+  // (notification, search index, dashboard) can subscribe without affecting
+  // the forge transaction.
+
+  event ArtifactForged {
+    payload: {
+      request_id: uuid,
+      result_id: uuid,
+      kind: string,
+      tier_used: string,
+      ast_compiles: bool,
+      confidence: float
+    }
+    delivery: at_least_once
+    ttl: 7d
+  }
+
+  event ForgeFailed {
+    payload: {
+      request_id: uuid,
+      reason: string,
+      trace_id: string
+    }
+    delivery: at_least_once
+    ttl: 7d
+  }
+
+  // ─── Extension points (prompt bodies live here, preserved across recompile)─
+  //
+  // The compiler emits a sentinel-bracketed region in src/extensions.ts for
+  // each of these. Rewrite the body once; future `marrowc compile` runs
+  // preserve it. See TEST/extensions_starter.ts for recommended content.
+
+  extension_point tmpl_analyze(
+    title: string,
+    description: string,
+    desired_kind: string,
+    target_path: string
+  ) {
+    returns: string
+    stable: true
+  }
+
+  extension_point tmpl_generate(
+    plan: string,
+    target_symbol: string,
+    files: string,
+    desired_kind: string,
+    target_path: string,
+    description: string
+  ) {
+    returns: string
+    stable: true
+  }
+
+  // 2-repo analysis prompt (Phase 9 + 12). Takes summaries of both repos
+  // (file_count + head_sha), the user's preset, and the original
+  // description. Output is JSON the generator can consume.
+  extension_point tmpl_analyze_repos(
+    title: string,
+    description: string,
+    preset: string,
+    repo_a_url: string,
+    repo_a_files: uint,
+    repo_a_sha: string,
+    repo_b_url: string,
+    repo_b_files: uint,
+    repo_b_sha: string
+  ) {
+    returns: string
+    stable: true
+  }
+
+  // Markdown report prompt for non-code presets (compare_apis, migrate,
+  // diagram). Sibling of tmpl_generate; same shape, but the output is a
+  // markdown document, validated as a non-empty string.
+  extension_point tmpl_generate_report(
+    plan: string,
+    target_symbol: string,
+    files: string,
+    desired_kind: string,
+    target_path: string,
+    description: string
+  ) {
+    returns: string
+    stable: true
+  }
+
+  // Scoping pass — runs between the analyzer and the codegen step. Reads
+  // the user's request + the analyst's plan and produces a TypeScript-shaped
+  // brief. The output decides what the codegen step sees:
+  //   - feasibility: "full"          → generator gets the revised plan unchanged
+  //                  "partial"       → generator gets the revised plan + caveats
+  //                  "not_achievable"→ generator gets a stub-mode plan that
+  //                                    documents WHY the work can't be done
+  //                                    in TS and what to do instead
+  // The point of this step: prevent the generator from fabricating fake
+  // bindings to non-TS systems (Python frameworks, native binaries, etc).
+  // Better to output an honest stub than a believable-but-broken adapter.
+  extension_point tmpl_scope_for_typescript(
+    description: string,
+    preset: string,
+    analysis: string
+  ) {
+    returns: string
+    stable: true
+  }
+
+  // ─── Models ────────────────────────────────────────────────────────────────
+  //
+  // Tiny runs on LAN host 10.0.0.20 via LM Studio's OpenAI-compatible shim
+  // at /v1. No API key required (LM Studio runs open by default). The
+  // 10.0.0.0/8 host is RFC1918 so the SSRF guard accepts it without an
+  // allowlist entry.
+  //
+  // The Tiny model is Qwen 3.6 35B Apex (heretic uncensored, mini int4
+  // quant) — a beefy local mid-range. Strong enough to handle every preset
+  // end-to-end at temperature 0.0 with deterministic output. The "Tiny"
+  // name is a label hangover from the harness era; despite the name this
+  // is a 35B-parameter model.
+  //
+  // Medium is DeepSeek v4 Flash on OpenRouter — a much larger cloud model
+  // we keep wired as the LAST-CHANCE fallback when Qwen exhausts its
+  // retry budget on a particular request. The Phase 13 fallback-escalation
+  // logic in the prompt body emitter automatically swaps to this model
+  // after the local model fails its final retry, giving requests one more
+  // shot on a stronger model before the call gives up.
+  //
+  // Set OPENAI_COMPAT_API_KEY=<your OpenRouter key> in .env. The request
+  // ALSO needs LLM_ENDPOINT_ALLOWLIST=https://openrouter.ai so the SSRF
+  // guard accepts the public endpoint.
+
+  model Tiny {
+    provider: openai_compat
+    endpoint: "http://10.0.0.20:1234/v1"
+    name: "mudler/qwen3.6-35b-a3b-uncensored-heretic-apex-gguf/qwen3.6-35b-a3b-uncensored-heretic-apex-i-mini.gguf"
+    context_window: 32000
+    max_output: 4096
+    temperature: 0.0
+    cost_class: medium
+    latency_class: medium
+  }
+
+  model Medium {
+    provider: openai_compat
+    endpoint: "https://openrouter.ai/api/v1"
+    name: "deepseek/deepseek-v4-flash:free"
+    context_window: 128000
+    max_output: 4096
+    temperature: 0.0
+    cost_class: large
+    latency_class: slow
+  }
+
+  // ─── Router ────────────────────────────────────────────────────────────────
+  //
+  // forge_router routes by `input.complexity` (0-1). With Qwen 35B as the
+  // workhorse we keep both tiers pointed at the same local model — every
+  // request lands on Qwen first. The router's `fallback:` slot is what
+  // matters: when Qwen exhausts its retry budget (e.g. 3 attempts at
+  // ast_compiles + 1 repair attempt all failed validation), the prompt
+  // body's last-chance fallback-escalation path kicks in and runs the
+  // request once more on Medium (DeepSeek). Different model, different
+  // approach, different chance of success.
+  //
+  // The chain is:
+  //   Qwen attempt 1 → validate    fail → repair on Qwen → re-validate
+  //   Qwen attempt 2 → validate    fail → repair on Qwen → re-validate
+  //   Qwen attempt 3 → validate    fail → repair on Qwen → re-validate
+  //   FALLBACK: DeepSeek attempt 1 → validate
+  //                                   ok → return
+  //                                 fail → throw original error
+  //
+  // confidence_threshold: 0.55 still applies — if Qwen's response confidence
+  // (when available) drops below 0.55, the runtime escalates to Medium
+  // mid-flow without exhausting the local retry budget first. Both paths
+  // end up on the stronger model when Qwen struggles.
+
+  router forge_router {
+    by: input.complexity
+    tier easy   { max: 0.7 -> Tiny }
+    tier heavy  {           -> Tiny }
+    on_low_confidence: escalate
+    confidence_threshold: 0.55
+    fallback: Medium
+  }
+
+  // ─── Prompts ───────────────────────────────────────────────────────────────
+  //
+  // (1) Analysis: cheap, idempotent, schema-validated. Always Tiny.
+  //     Returns JSON: { kind, summary, plan, target_symbol, complexity }
+  //
+  // (2) Generation: routes through forge_router. Output is treated as code,
+  //     parsed via tsc (`validate: ast_compiles`). On invalid, the prompt
+  //     body calls a smaller bounded repair prompt automatically.
+  //     Cached by hash(plan + description + target_symbol) — re-runs of the
+  //     same forge request are free.
+
+  prompt analyze_forge_request(
+    title: string,
+    description: string,
+    desired_kind: string,
+    target_path: string
+  ) {
+    router: forge_router
+    template: "extension_point:tmpl_analyze"
+    returns: string
+    timeout: 120s
+    idempotent: true
+    validate: schema_only
+    on_invalid: retry
+    retry: { max_attempts: 2, backoff: exponential, interval: 500ms }
+    cache: { key: hash(description), ttl: 1h }
+  }
+
+  // Multi-repo analyzer. Routes through forge_router so it picks up the same
+  // fallback-to-Medium escalation that the generators get — when Qwen 35B
+  // exhausts its retries (e.g. on slow analyzer prompts that time out), the
+  // request automatically retries on DeepSeek before giving up. Without
+  // this routing, a slow Qwen analyze pass would abort the whole forge_from_repos
+  // pipeline before the generator step ever ran.
+  //
+  // Returns JSON: { kind, summary, plan, target_symbol, complexity,
+  //                ingredients_from_a, ingredients_from_b, graft_point }
+  prompt analyze_repo_forge_request(
+    title: string,
+    description: string,
+    preset: string,
+    repo_a_url: string,
+    repo_a_files: uint,
+    repo_a_sha: string,
+    repo_b_url: string,
+    repo_b_files: uint,
+    repo_b_sha: string
+  ) {
+    router: forge_router
+    template: "extension_point:tmpl_analyze_repos"
+    returns: string
+    timeout: 180s
+    idempotent: true
+    validate: schema_only
+    on_invalid: retry
+    retry: { max_attempts: 2, backoff: exponential, interval: 500ms }
+    cache: { key: hash(description), ttl: 1h }
+  }
+
+  prompt generate_forge_artifact(
+    plan: string,
+    target_symbol: string,
+    files: string,
+    desired_kind: string,
+    target_path: string,
+    description: string,
+    complexity: float
+  ) {
+    router: forge_router
+    template: "extension_point:tmpl_generate"
+    returns: string
+    timeout: 240s
+    validate: ast_compiles
+    on_invalid: retry_with_repair_prompt
+    retry: { max_attempts: 3, backoff: exponential, interval: 1s }
+    cache: { key: hash(plan), ttl: 24h }
+  }
+
+  // Markdown-output sibling of generate_forge_artifact. Used for presets
+  // whose artifact is a report rather than code (compare_apis, migrate,
+  // diagram). Same router, same retry budget — but validate: schema_only
+  // because the output isn't TypeScript.
+  prompt generate_forge_report(
+    plan: string,
+    target_symbol: string,
+    files: string,
+    desired_kind: string,
+    target_path: string,
+    description: string,
+    complexity: float
+  ) {
+    router: forge_router
+    template: "extension_point:tmpl_generate_report"
+    returns: string
+    timeout: 240s
+    validate: schema_only
+    on_invalid: retry
+    retry: { max_attempts: 3, backoff: exponential, interval: 1s }
+    cache: { key: hash(plan), ttl: 24h }
+  }
+
+  // ─── TypeScript scoping pass ───────────────────────────────────────────────
+  //
+  // Runs between the analyzer and the codegen step. The analyzer is happy to
+  // propose grafting Python files into existing Python projects — that's a
+  // perfectly correct architectural answer to the user's request. But our
+  // codegen only emits TypeScript, so without a scoping step the generator
+  // either fakes its way through producing TS code that calls into Python
+  // (broken), or refuses entirely (worse UX).
+  //
+  // The scoping step's job: read the analysis, decide what's achievable in
+  // pure TypeScript, and rewrite the plan so the generator has a realistic
+  // target. Three feasibility verdicts:
+  //   "full"           — the requested artifact can be a single TS file
+  //   "partial"        — TS can do part of the job; the rest needs other
+  //                      languages or runtime systems. Caveats listed.
+  //   "not_achievable" — a meaningful TS artifact isn't possible. The
+  //                      codegen step then emits a documented stub explaining
+  //                      what to do instead.
+  //
+  // Returns JSON: { feasibility, revised_plan, target_symbol, complexity,
+  //                 out_of_scope, caveats }
+  //
+  // Routes through forge_router so the same fallback escalation applies.
+  // Validate schema_only — the output is JSON, not code.
+  prompt scope_for_typescript(
+    description: string,
+    preset: string,
+    analysis: string
+  ) {
+    router: forge_router
+    template: "extension_point:tmpl_scope_for_typescript"
+    returns: string
+    timeout: 120s
+    validate: schema_only
+    on_invalid: retry
+    retry: { max_attempts: 2, backoff: exponential, interval: 500ms }
+    cache: { key: hash(description), ttl: 1h }
+  }
+
+  // ─── Capabilities ──────────────────────────────────────────────────────────
+  //
+  // Each capability below is a typed, deterministic action. The forge()
+  // capability at the bottom is the public entry point — everything else
+  // composes into it.
+
+  // Bounded retrieval. Walks the symbol/dependency graph that bin/index_sources.ts
+  // built offline. hop_depth=2 + max_files=8 keeps the slice small enough to
+  // fit in Tiny's context window without dropping the relevant bits.
+  capability slice_codebase(r: ForgeRequest) {
+    cognition: semantic_slice using {
+      task: r.description,
+      max_files: 8,
+      hop_depth: 2
+    }
+    returns: string
+    sync: eventual
+    idempotent: true
+  }
+
+  // ─── Repository ingestion (Phase 9) ────────────────────────────────────────
+  //
+  // Two capabilities, one per repo. The runtime clones each into a sandbox
+  // under LLM_INGEST_ROOT, deny-list-aware and size-capped. Idempotent —
+  // re-running with the same (url, ref) pair short-circuits to the cache.
+
+  capability ingest_repo_a(r: RepoForgeRequest) {
+    cognition: ingest_repository using {
+      url: r.repo_a_url,
+      ref: r.repo_a_ref
+    }
+    returns: json
+    sync: eventual
+    idempotent: true
+  }
+
+  capability ingest_repo_b(r: RepoForgeRequest) {
+    cognition: ingest_repository using {
+      url: r.repo_b_url,
+      ref: r.repo_b_ref
+    }
+    returns: json
+    sync: eventual
+    idempotent: true
+  }
+
+  // Persisting capabilities — these are plain transactional ops; the runtime
+  // wraps them in BEGIN/COMMIT and emits the audit row + outbox event.
+  capability save_forge_result(res: ForgeResult) {
+    requires: [
+      res.confidence >= 0.0,
+      res.confidence <= 1.0
+    ]
+    effects: [
+      res.ast_compiles = true
+    ]
+    emits: ArtifactForged
+    sync: transactional
+  }
+
+  capability mark_forge_failed(res: ForgeResult, reason: string) {
+    effects: [
+      res.ast_compiles = false
+    ]
+    emits: ForgeFailed
+    sync: transactional
+  }
+
+  // ─── Public entry point: the forge pipeline ────────────────────────────────
+  //
+  // analyze → slice → generate → save. Every step is bounded; on_error:
+  // rollback walks the compensations the runtime has tracked. The pipeline
+  // is a compile-time DAG, not a runtime agent loop — same ForgeRequest
+  // always produces the same call sequence.
+  //
+  // The output of each prompt step is bound via `as <alias>`; the alias is a
+  // string at the IR level. The user-facing API hands those values back to
+  // a small TypeScript adapter (extension_point: forge_assemble_result) that
+  // builds the typed ForgeResult, but that adapter is generated automatically
+  // by the framework — no manual wiring required.
+  capability forge(r: ForgeRequest) {
+    pipeline: {
+      analyze_forge_request(r.title, r.description, r.desired_kind, r.target_path) as analysis
+      slice_codebase(r) as slice
+      generate_forge_artifact(analysis, "", slice, r.desired_kind, r.target_path, r.description, r.complexity) as artifact
+      on_error: rollback
+    }
+    sync: transactional
+    timeout: 15m
+  }
+
+  // ─── Public entry point: forge_from_repos pipeline ─────────────────────────
+  //
+  // Take 2 GitHub URLs + a preset → clone both → analyze → generate → save.
+  //
+  //   ingest_repo_a      clone repo A (cached by sha256(url|ref))
+  //   ingest_repo_b      clone repo B
+  //   analyze_repos      Gemma reads URLs + counts + SHAs + the preset and
+  //                      produces a typed plan with target_symbol +
+  //                      ingredient hints
+  //   match r.preset {
+  //     case "compare_apis":  generate_forge_report (markdown, schema_only)
+  //     case "migrate":       generate_forge_report (markdown, schema_only)
+  //     default:              generate_forge_artifact (TS, ast_compiles + repair)
+  //   }                  Phase 11 runtime branching — same input always
+  //                      lands on the same arm; the runtime picks the
+  //                      right validator + repair strategy per preset.
+  //   on_error: rollback if any step fails, the runtime walks the
+  //                      compensations the prior steps registered.
+  //
+  // Phase 9 polish: the analyze step now reads `repo_a.file_count` and
+  // `repo_a.head_sha` from the alias the ingest step bound — pipeline
+  // emitter rewrites these to __pipeline_results["repo_a"].* automatically.
+  //
+  // Phase 12: PERSISTENCE.
+  //   The pipeline returns __pipeline_results = { repo_a, repo_b, analysis,
+  //   artifact } to the caller. Two save paths:
+  //
+  //     (a) HTTP / production: clients POST the assembled ForgeResult to
+  //         /forge_results/save-forge-result (the route the framework
+  //         already generates from `save_forge_result` below). That route
+  //         is wrapped in BEGIN/COMMIT, runs the requires:/effects:
+  //         checks, writes the audit row, and emits ArtifactForged into
+  //         the outbox — the standard transactional save the framework
+  //         provides for any capability with `sync: transactional`.
+  //
+  //     (b) Demo / local: TEST/output/bin/forge_demo_repos.ts builds the
+  //         same ForgeResult shape from the pipeline output and writes
+  //         it to .forge-cache/results/<id>.json. Same UX, no DB needed.
+  //
+  //   We intentionally do NOT bake the save call into the pipeline body
+  //   itself: pipelines compose stateless prompts and cognition primitives
+  //   so they remain replay-safe. Stateful save lives at the HTTP boundary
+  //   (handler returns the pipeline payload, caller decides what to keep)
+  //   or in a sibling `flow` block when explicit compensations are needed.
+
+  capability forge_from_repos(r: RepoForgeRequest) {
+    pipeline: {
+      ingest_repo_a(r) as repo_a
+      ingest_repo_b(r) as repo_b
+      analyze_repo_forge_request(r.title, r.description, r.preset, r.repo_a_url, repo_a.file_count, repo_a.head_sha, r.repo_b_url, repo_b.file_count, repo_b.head_sha) as analysis
+      scope_for_typescript(r.description, r.preset, analysis) as scoped
+      match r.preset {
+        case "compare_apis": generate_forge_report(analysis, "", "", r.preset, r.target_path, r.description, r.complexity) as artifact
+        case "migrate":      generate_forge_report(analysis, "", "", r.preset, r.target_path, r.description, r.complexity) as artifact
+        default:             generate_forge_artifact(scoped, "", "", r.preset, r.target_path, r.description, r.complexity) as artifact
+      }
+      on_error: rollback
+    }
+    sync: transactional
+    timeout: 20m
+  }
+
+  // ─── Policy ────────────────────────────────────────────────────────────────
+  //
+  // Rate-limit applies per-tenant when the API key is present. audit: true
+  // turns on the audit_log table; encryption: in_transit drives TLS in
+  // emit_deploy.ts. Sensitive fields are redacted from spans automatically
+  // via the @sensitive annotation (none in this example, but the mechanism
+  // is wired).
+
+  policy forge_policy {
+    rate_limit: 30 per 1m
+    audit: true
+    encryption: in_transit
+    cost_budgets: [
+      {
+        scope: per_tenant
+        window: 1d
+        cap_tokens: 500000
+        on_exceeded: { action: error, code: "DEEPSEEK_DAILY_LIMIT" }
+      }
+    ]
+  }
+
+  // ─── Evaluation (Phase 16) ─────────────────────────────────────────────────
+  //
+  // Typed regression tests for the forge artifact generator. Cases pin the
+  // baseline pass rate so a PR that changes the prompt template or scoping
+  // logic gets flagged before it ships. Run via:
+  //   npx ts-node bin/evaluate.ts generate_forge_quality
+
+  evaluation generate_forge_quality {
+    prompt: generate_forge_artifact
+
+    cases: [
+      {
+        name: "simple_adapter"
+        input: {
+          plan: "Build a compat layer"
+          target_symbol: ""
+          files: ""
+          desired_kind: "compat_layer"
+          target_path: "src/adapter.ts"
+          description: "Bridge two APIs"
+          complexity: 0.5
+        }
+        expected: {
+          passes: ast_compiles
+          max_lines: 400
+          must_contain_string: ["export"]
+        }
+      },
+      {
+        name: "complex_feature"
+        input: {
+          plan: "Full payment processing module"
+          target_symbol: ""
+          files: ""
+          desired_kind: "full_feature"
+          target_path: "src/payments.ts"
+          description: "Stripe-compatible payment flow"
+          complexity: 0.85
+        }
+        expected: {
+          passes: ast_compiles
+          min_lines: 20
+          must_not_contain_string: ["TODO", "FIXME"]
+        }
+      }
+    ]
+
+    metric: pass_rate
+    baseline: { min_pass_rate: 0.5 }
+    schedule: { on: ["pre_commit"] }
+  }
+
+  // ─── Review flow (Phase 17) ────────────────────────────────────────────────
+  //
+  // A reviewable variant of the single-repo forge pipeline. The scoping step
+  // runs first, then the flow pauses at a checkpoint so a human can review
+  // the feasibility analysis before the expensive generate step fires. This
+  // is the exact spec-kit workflow MarrowScript now supports natively.
+  //
+  // The user reviews via:
+  //   POST /flow_runs/:id/checkpoint/review_scope
+  //   { "decision": "approve", "flow_name": "forge_review" }
+  //
+  // Allowed decisions: approve (continue to generate), reject (mark failed),
+  // edit (continue with edited description), regenerate (re-run scope).
+
+  capability scope_request(r: ForgeRequest) {
+    requires: [r.complexity >= 0.0]
+    sync: eventual
+    idempotent: true
+  }
+
+  capability generate_request(r: ForgeRequest) {
+    requires: [r.complexity >= 0.0]
+    sync: eventual
+    idempotent: true
+  }
+
+  flow forge_review {
+    step scope: scope_request(r)
+      checkpoint: review_scope {
+        shows: [r.title, r.description, r.complexity]
+        allow: ["approve", "reject", "edit", "regenerate"]
+        timeout: 24h
+        on_timeout: cancel
+      }
+    step generate: generate_request(r)
+  }
+}

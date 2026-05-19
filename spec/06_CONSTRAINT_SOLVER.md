@@ -1,12 +1,12 @@
-# BoneScript Constraint Solver Specification
+# MarrowScript Constraint Solver Specification
 
 ## 1. Purpose
 
-The constraint solver is the mechanism by which BoneScript eliminates ambiguity.
+The constraint solver is the mechanism by which MarrowScript eliminates ambiguity.
 It is NOT a heuristic system. It is a **deterministic constraint propagation engine**
 that resolves all underspecified aspects of a program into concrete decisions.
 
-The key insight: a BoneScript program may leave certain implementation details
+The key insight: a MarrowScript program may leave certain implementation details
 unspecified. The constraint solver fills these gaps using ONLY:
 - Ontology implication rules (spec 03)
 - Domain defaults (spec 03, Â§4)
@@ -31,7 +31,7 @@ is rejected with an error requiring the programmer to be explicit.
 
 ## 3. Constraint Language
 
-Constraints in BoneScript are first-class. They appear in:
+Constraints in MarrowScript are first-class. They appear in:
 - Entity `constraints` clauses
 - Capability `requires` clauses
 - Top-level `constraint` declarations
@@ -195,7 +195,7 @@ exactly what architecture is generated.
 ## 8. Example: Full Resolution Trace
 
 Input program:
-```BoneScript
+```MarrowScript
 system Game {
   domain: multiplayer_game
   entity Player { owns: [name: string], auth: jwt }

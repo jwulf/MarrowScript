@@ -14,5 +14,5 @@
     "resolveJsonModule": true
   },
   "include": ["src/**/*"],
-  "exclude": ["node_modules", "dist", "src/test.ts", "src/test_typechecker.ts", "src/test_nakama.ts"]
+  "exclude": ["node_modules", "dist", "src/test.ts", "src/test_typechecker.ts", "src/test_nakama.ts", "src/test_cognition_parse.ts", "src/test_cognition_emit.ts", "src/test_cognition_e2e.ts", "src/test_cognition_phase3.ts", "src/test_cognition_phase4.ts", "src/test_cognition_phase5.ts", "src/test_cognition_phase6.ts", "src/test_cognition_phase7.ts", "src/test_cognition_phase8.ts", "src/test_cognition_phase9.ts", "src/test_cognition_phase10.ts", "src/test_cognition_phase14.ts", "src/test_cognition_phase15.ts", "src/test_cognition_phase16.ts", "src/test_cognition_phase17.ts", "src/test_cognition_phase18.ts", "src/test_cognition_phase19.ts", "src/test_cognition_phase19_v2.ts", "src/test_cognition_phase20.ts", "src/test_cognition_phase20_v2.ts", "src/test_cognition_phase21.ts", "src/test_cognition_phase22.ts"]
 }

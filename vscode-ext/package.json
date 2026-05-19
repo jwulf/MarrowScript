@@ -1,9 +1,9 @@
 {
-  "name": "bonescript-vscode",
-  "displayName": "BoneScript Language Support",
-  "description": "Syntax highlighting, diagnostics, completions, hover, go-to-definition, and outline for BoneScript (.bone) files",
+  "name": "marrowscript-vscode",
+  "displayName": "MarrowScript Language Support",
+  "description": "Syntax highlighting, diagnostics, completions, hover, go-to-definition, and outline for MarrowScript (.marrow) files",
   "version": "0.2.0",
-  "publisher": "bonescript",
+  "publisher": "marrowscript",
   "engines": {
     "vscode": "^1.85.0"
   },
@@ -13,16 +13,16 @@
     "languages": [
       {
         "id": "bone",
-        "aliases": ["BoneScript", "bone"],
-        "extensions": [".bone"],
+        "aliases": ["MarrowScript", "bone"],
+        "extensions": [".marrow"],
         "configuration": "./language-configuration.json"
       }
     ],
     "grammars": [
       {
         "language": "bone",
-        "scopeName": "source.bone",
-        "path": "./syntaxes/bone.tmLanguage.json"
+        "scopeName": "source.marrow",
+        "path": "./syntaxes/marrow.tmLanguage.json"
       }
     ]
   },
@@ -30,7 +30,7 @@
     "build": "tsc",
     "watch": "tsc -w",
     "package": "npx vsce package --no-dependencies",
-    "install-ext": "code --install-extension bonescript-vscode-0.2.0.vsix"
+    "install-ext": "code --install-extension marrowscript-vscode-0.2.0.vsix"
   },
   "dependencies": {
     "vscode-languageclient": "9.0.1"

@@ -1,9 +1,9 @@
-# BoneScript Ontology Specification
+# MarrowScript Ontology Specification
 
 ## 1. Purpose
 
-The ontology defines the **closed set of concepts** that BoneScript programs can express.
-Every token in a BoneScript program must resolve to exactly one ontological concept.
+The ontology defines the **closed set of concepts** that MarrowScript programs can express.
+Every token in a MarrowScript program must resolve to exactly one ontological concept.
 There is no "unknown" category. If a concept cannot be mapped, the program is invalid.
 
 This is NOT a keyword list. It is a **formal concept lattice** with:

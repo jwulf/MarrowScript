@@ -1,7 +1,5 @@
-# BoneScript
 
-[![npm](https://img.shields.io/npm/v/bonescript-compiler)](https://www.npmjs.com/package/bonescript-compiler)
-[![license](https://img.shields.io/npm/l/bonescript-compiler)](https://github.com/dantheman181/bonescript/blob/main/compiler/LICENSE)
+[![license](https://img.shields.io/npm/l/marrowscript-compiler)](https://github.com/dantheman181/marrowscript/blob/main/compiler/LICENSE)
 
 A declarative language that compiles system descriptions into complete, runnable Node.js backends. Write the bones, get the whole skeleton.
 
@@ -33,20 +31,20 @@ system Shop {
 }
 ```
 
-Run `bonec compile shop.bone` and get back a complete project: Express API, PostgreSQL migrations, JWT auth, state machine enforcement, transactional SQL, durable events, health checks, WebSocket support, OpenAPI spec, TypeScript SDK, Zod schemas, Postman collection, GraphQL schema, seed file, audit log, cron stubs, notification service, admin panel, Dockerfile, and GitHub Actions CI. No LLMs. Deterministic — same input always produces identical output.
+Run `marrowc compile shop.marrow` and get back a complete project: Express API, PostgreSQL migrations, JWT auth, state machine enforcement, transactional SQL, durable events, health checks, WebSocket support, OpenAPI spec, TypeScript SDK, Zod schemas, Postman collection, GraphQL schema, seed file, audit log, cron stubs, notification service, admin panel, Dockerfile, and GitHub Actions CI. No LLMs. Deterministic — same input always produces identical output.
 
 ---
 
 ## Install
 
 ```bash
-npm install -g bonescript-compiler
+npm install -g marrowscript-compiler
 ```
 
 Or run without installing:
 
 ```bash
-npx bonescript-compiler compile shop.bone
+npx marrowscript-compiler compile shop.marrow
 ```
 
 Requires Node.js 18 or later.
@@ -57,10 +55,10 @@ Requires Node.js 18 or later.
 
 ```bash
 # 1. Scaffold a new project
-bonec init my-app --domain saas_platform
+marrowc init my-app --domain saas_platform
 
 # 2. Compile
-bonec compile my-app/my-app.bone
+marrowc compile my-app/my-app.marrow
 
 # 3. Configure
 cp my-app/output/.env.example my-app/output/.env
@@ -80,7 +78,7 @@ npm run dev
 ### Nakama target (game backends)
 
 ```bash
-bonec compile game.bone --target nakama
+marrowc compile game.marrow --target nakama
 cd output-nakama && npm install && npm run build
 # Copy build/ to your Nakama runtime path
 ```
@@ -88,26 +86,26 @@ cd output-nakama && npm install && npm run build
 ### Prisma target (schema only)
 
 ```bash
-bonec compile shop.bone --target prisma
+marrowc compile shop.marrow --target prisma
 cd output && npx prisma migrate dev --name init && npx prisma generate
 ```
 
-Produces a standalone `prisma/schema.prisma` with proper type mappings, relations, indexes, and infrastructure models. Use this when you want BoneScript's modeling power with Prisma's migration and client tooling.
+Produces a standalone `prisma/schema.prisma` with proper type mappings, relations, indexes, and infrastructure models. Use this when you want MarrowScript's modeling power with Prisma's migration and client tooling.
 
 ### SQLite target (schema-only)
 
 ```bash
-bonec compile shop.bone --target sqlite
+marrowc compile shop.marrow --target sqlite
 cd output-sqlite && npm install && npm run migrate
 ```
 
-Produces SQLite-flavored migrations and a typed `better-sqlite3` DB client. **Schema-only** — no Express routes, no auth, no SDK. Use this when you want BoneScript's modeling layer over SQLite without the full backend. Full SQLite route generation is on the roadmap.
+Produces SQLite-flavored migrations and a typed `better-sqlite3` DB client. **Schema-only** — no Express routes, no auth, no SDK. Use this when you want MarrowScript's modeling layer over SQLite without the full backend. Full SQLite route generation is on the roadmap.
 
 ---
 
 ## What Gets Generated
 
-From a single `.bone` file, `bonec compile` produces a complete project:
+From a single `.marrow` file, `marrowc compile` produces a complete project:
 
 ```
 output/
@@ -148,7 +146,7 @@ output/
 ### Compile flags
 
 ```bash
-bonec compile <file> [options]
+marrowc compile <file> [options]
 
 --target express     Express/PostgreSQL output (default — complete backend)
 --target nakama      Nakama TypeScript runtime output
@@ -260,23 +258,23 @@ extension_point calculate_fee(order: Order) {
 
 | Command | Description |
 |---------|-------------|
-| `bonec compile <file>` | Full 7-stage compilation → runnable project |
-| `bonec compile <file> --target nakama` | Compile to Nakama TypeScript runtime |
-| `bonec compile <file> --target prisma` | Compile to Prisma schema |
-| `bonec compile <file> --target sqlite` | Compile to SQLite migrations + DB client (schema-only) |
-| `bonec check <file>` | Validate without generating code |
-| `bonec validate [output-dir]` | Type-check generated output (runs `tsc --noEmit`) |
-| `bonec fmt <file>` | Format in place |
-| `bonec watch <file>` | Recompile on save |
-| `bonec init <name>` | Scaffold from a domain template |
-| `bonec diff <old> <new>` | Show schema migration diff |
-| `bonec test [output-dir]` | Run generated regression tests |
-| `bonec debug <file>` | Generate source maps |
-| `bonec verify-determinism <file>` | Confirm two compilations are identical |
+| `marrowc compile <file>` | Full 7-stage compilation → runnable project |
+| `marrowc compile <file> --target nakama` | Compile to Nakama TypeScript runtime |
+| `marrowc compile <file> --target prisma` | Compile to Prisma schema |
+| `marrowc compile <file> --target sqlite` | Compile to SQLite migrations + DB client (schema-only) |
+| `marrowc check <file>` | Validate without generating code |
+| `marrowc validate [output-dir]` | Type-check generated output (runs `tsc --noEmit`) |
+| `marrowc fmt <file>` | Format in place |
+| `marrowc watch <file>` | Recompile on save |
+| `marrowc init <name>` | Scaffold from a domain template |
+| `marrowc diff <old> <new>` | Show schema migration diff |
+| `marrowc test [output-dir]` | Run generated regression tests |
+| `marrowc debug <file>` | Generate source maps |
+| `marrowc verify-determinism <file>` | Confirm two compilations are identical |
 
 ### Domain Templates
 
-`bonec init my-app --domain <name>`
+`marrowc init my-app --domain <name>`
 
 | Domain | Auth | DB | Sync |
 |--------|------|----|------|
@@ -301,7 +299,7 @@ A self-contained admin UI — no build step, no dependencies beyond a Tailwind C
 - Delete with confirmation
 - Capability buttons that POST to capability endpoints
 - Bearer token auth stored in localStorage
-- API URL configurable via `<meta name="bonescript-api-url">` tag
+- API URL configurable via `<meta name="marrowscript-api-url">` tag
 
 ### TypeScript SDK (`sdk/client.ts`)
 
@@ -368,7 +366,7 @@ Pluggable email notifications on event emissions. Configure via env:
 - `NOTIFY_PROVIDER=log` (default — prints to console)
 - `NOTIFY_PROVIDER=resend` — sends through [Resend](https://resend.com) (set `NOTIFY_API_KEY`)
 - `NOTIFY_PROVIDER=sendgrid` — sends through SendGrid (set `NOTIFY_API_KEY`)
-- `NOTIFY_PROVIDER=webhook` — POSTs JSON to `NOTIFY_WEBHOOK_URL`. Set `NOTIFY_WEBHOOK_SECRET` to enable HMAC-SHA256 signing in the `X-BoneScript-Signature` header.
+- `NOTIFY_PROVIDER=webhook` — POSTs JSON to `NOTIFY_WEBHOOK_URL`. Set `NOTIFY_WEBHOOK_SECRET` to enable HMAC-SHA256 signing in the `X-MarrowScript-Signature` header.
 
 ### Cron Jobs (`src/cron.ts`)
 
@@ -433,10 +431,10 @@ In durable mode:
 
 ## Compilation Pipeline
 
-Every stage is deterministic — same `.bone` file always produces bitwise-identical output.
+Every stage is deterministic — same `.marrow` file always produces bitwise-identical output.
 
 ```
-.bone source
+.marrow source
     ↓ Lex          tokens
     ↓ Parse        AST (with error recovery)
     ↓ Type Check   validated AST
@@ -455,7 +453,7 @@ Every stage is deterministic — same `.bone` file always produces bitwise-ident
 .\install-extension.ps1
 ```
 
-Open any `.bone` file and get real-time error highlighting, context-aware completions, hover docs, go-to-definition, document outline, signature help, and quick fixes.
+Open any `.marrow` file and get real-time error highlighting, context-aware completions, hover docs, go-to-definition, document outline, signature help, and quick fixes.
 
 ---
 
@@ -472,19 +470,19 @@ npm test
 
 ```
 spec/           Language specification (10 formal documents)
-compiler/       Reference compiler (TypeScript) — bonescript-compiler on npm
+compiler/       Reference compiler (TypeScript) — marrowscript-compiler on npm
   src/          Lexer, parser, type checker, IR, 15+ emitters, CLI
   dist/         Compiled output
 lsp/            Language Server Protocol server
 vscode-ext/     VS Code extension
-examples/       Example .bone programs
+examples/       Example .marrow programs
 ```
 
 ---
 
 ## Status
 
-Published to npm as [`bonescript-compiler`](https://www.npmjs.com/package/bonescript-compiler) v0.8.1.
+Published to npm as [`marrowscript-compiler`](https://www.npmjs.com/package/marrowscript-compiler) v0.8.1.
 
 The compiler pipeline is complete and deterministic. All generated code from the Express target compiles and runs. The SQLite target is currently schema-only. The VS Code extension provides real-time feedback.
 

@@ -1,5 +1,5 @@
 /**
- * BoneScript Compiler — Public API
+ * MarrowScript Compiler — Public API
  * Import this module to use the compiler programmatically.
  */
 
@@ -56,9 +56,9 @@ export { emitCronJobs } from "./emit_cron";
 export { emitGraphQLSchema } from "./emit_graphql";
 
 /**
- * Convenience function: compile a .bone source string to files.
+ * Convenience function: compile a .marrow source string to files.
  */
-export async function compile(source: string, sourceFile: string = "program.bone"): Promise<{
+export async function compile(source: string, sourceFile: string = "program.marrow"): Promise<{
   files: { path: string; content: string; language: string; source_module: string }[];
   errors: string[];
   warnings: string[];

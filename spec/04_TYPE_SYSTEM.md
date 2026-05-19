@@ -1,8 +1,8 @@
-# BoneScript Type System Specification
+# MarrowScript Type System Specification
 
 ## 1. Overview
 
-BoneScript uses a **structural type system** â€” types are defined by their shape,
+MarrowScript uses a **structural type system** â€” types are defined by their shape,
 not by name. Two types are equal if and only if they have the same structure.
 
 The type system serves two purposes:
@@ -55,7 +55,7 @@ Value is exactly one of the constituent types. Discriminated by runtime tag.
 
 An entity declaration introduces a **named record type**:
 
-```BoneScript
+```MarrowScript
 entity Player {
   owns: [username: string, score: uint]
 }
@@ -163,16 +163,16 @@ If it doesn't, the program is rejected.
 
 ## 5. Subtyping
 
-BoneScript has NO subtyping. Types are equal or they are not.
+MarrowScript has NO subtyping. Types are equal or they are not.
 
 Exception: `optional<T>` accepts values of type `T` (implicit wrapping).
 
 ## 6. Type Inference
 
-BoneScript does NOT perform type inference on declarations. All fields must be
+MarrowScript does NOT perform type inference on declarations. All fields must be
 explicitly typed. However, within expressions, intermediate types are inferred:
 
-```BoneScript
+```MarrowScript
 constraints: [quantity >= 0]
 ```
 

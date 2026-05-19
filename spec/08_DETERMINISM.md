@@ -1,8 +1,8 @@
-# BoneScript Determinism Specification
+# MarrowScript Determinism Specification
 
 ## 1. The Determinism Guarantee
 
-**Axiom**: Given source program P, the BoneScript compiler produces output O such that:
+**Axiom**: Given source program P, the MarrowScript compiler produces output O such that:
 ```
 âˆ€ executions e1, e2 of compile(P):
   output(e1) = output(e2)    (bitwise equality)
@@ -11,7 +11,7 @@
 This is not aspirational. It is a hard requirement. Any compiler implementation
 that violates this property is INCORRECT.
 
-## 2. Sources of Non-Determinism (and how BoneScript eliminates each)
+## 2. Sources of Non-Determinism (and how MarrowScript eliminates each)
 
 ### 2.1 Hash Map Iteration Order
 
@@ -71,14 +71,14 @@ Each optimization is idempotent. The sequence is:
 ### 2.8 Floating Point
 
 **Problem**: Floating point operations can produce different results on different platforms.
-**Solution**: BoneScript does not use floating point in compilation. Float literals
+**Solution**: MarrowScript does not use floating point in compilation. Float literals
 in source are preserved as strings until codegen, where they are emitted verbatim.
 
 ## 3. Determinism Verification
 
 The compiler includes a self-check mode:
 ```
-bone compile --verify-determinism program.bone
+bone compile --verify-determinism program.marrow
 ```
 
 This compiles the program TWICE and asserts bitwise equality of output.
@@ -115,7 +115,7 @@ for each semantic equivalence class.
 
 ## 5. Formal Proof of Determinism
 
-**Theorem**: The BoneScript compilation function `compile: Source â†’ Output` is a pure function.
+**Theorem**: The MarrowScript compilation function `compile: Source â†’ Output` is a pure function.
 
 **Proof by structural induction on the pipeline**:
 

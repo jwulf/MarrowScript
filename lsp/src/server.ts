@@ -11,11 +11,11 @@ import {
   RenameParams, PrepareRenameParams,
 } from 'vscode-languageserver/node';
 import { TextDocument } from 'vscode-languageserver-textdocument';
-import { Lexer, LexerError } from 'bonescript-compiler';
-import { Parser } from 'bonescript-compiler';
-import { ParseError } from 'bonescript-compiler';
-import { TypeChecker } from 'bonescript-compiler';
-import { AST } from 'bonescript-compiler';
+import { Lexer, LexerError } from 'marrowscript-compiler';
+import { Parser } from 'marrowscript-compiler';
+import { ParseError } from 'marrowscript-compiler';
+import { TypeChecker } from 'marrowscript-compiler';
+import { AST } from 'marrowscript-compiler';
 
 const connection = createConnection(ProposedFeatures.all);
 const documents = new TextDocuments(TextDocument);
@@ -28,13 +28,22 @@ interface DocSymbols {
   events: Map<string, AST.EventDeclNode>;
   stores: Map<string, AST.StoreDeclNode>;
   channels: Map<string, AST.ChannelDeclNode>;
+  // Cognition Layer (Phase 1+) — track the new top-level decls so hover,
+  // go-to-definition, and rename work for them just like the older kinds.
+  models: Map<string, AST.ModelDeclNode>;
+  prompts: Map<string, AST.PromptDeclNode>;
+  routers: Map<string, AST.RouterDeclNode>;
+  extensionPoints: Map<string, AST.ExtensionPointDeclNode>;
   ast: AST.ProgramNode | null;
 }
 const symbolCache = new Map<string, DocSymbols>();
 
 function emptySymbols(): DocSymbols {
   return { entities: new Map(), capabilities: new Map(), events: new Map(),
-           stores: new Map(), channels: new Map(), ast: null };
+           stores: new Map(), channels: new Map(),
+           models: new Map(), prompts: new Map(), routers: new Map(),
+           extensionPoints: new Map(),
+           ast: null };
 }
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
@@ -102,6 +111,10 @@ function validateAndExtract(doc: TextDocument): void {
           case 'EventDecl': symbols.events.set(decl.name, decl); break;
           case 'StoreDecl': symbols.stores.set(decl.name, decl); break;
           case 'ChannelDecl': symbols.channels.set(decl.name, decl); break;
+          case 'ModelDecl': symbols.models.set(decl.name, decl); break;
+          case 'PromptDecl': symbols.prompts.set(decl.name, decl); break;
+          case 'RouterDecl': symbols.routers.set(decl.name, decl); break;
+          case 'ExtensionPointDecl': symbols.extensionPoints.set(decl.name, decl); break;
         }
       }
     }
@@ -134,6 +147,7 @@ function validateAndExtract(doc: TextDocument): void {
 
 type BoneContext = 'top_level' | 'system_body' | 'entity_body' | 'capability_body'
   | 'channel_body' | 'store_body' | 'event_body' | 'policy_body' | 'flow_body'
+  | 'model_body' | 'prompt_body' | 'router_body' | 'router_tier_body'
   | 'field_type' | 'field_access';
 
 function detectContext(doc: TextDocument, pos: Position): BoneContext {
@@ -145,7 +159,10 @@ function detectContext(doc: TextDocument, pos: Position): BoneContext {
     if (before[i] === '{') {
       const pre = before.slice(Math.max(0, i - 120), i);
       // capability uses `name(params) {` — match name followed by optional (…) before {
-      const kw = pre.match(/\b(system|entity|capability|channel|store|event|policy|flow)\s+\w+(?:\s*\([^)]*\))?\s*$/);
+      // prompt also uses `(params) {`. router has `by:` plus `tier name { max: X -> Model }`.
+      const kw = pre.match(/\b(system|entity|capability|channel|store|event|policy|flow|model|prompt|router|tier)\s+\w+(?:\s*\([^)]*\))?\s*$/);
+      // router declares its `tier <name> { max: X -> Model }` so we have to recognise
+      // a bare `tier` keyword too (no parens). The regex above already handles it.
       opens.push(kw ? kw[1] : 'unknown');
     } else if (before[i] === '}') { opens.pop(); }
   }
@@ -158,6 +175,8 @@ function detectContext(doc: TextDocument, pos: Position): BoneContext {
     system: 'system_body', entity: 'entity_body', capability: 'capability_body',
     channel: 'channel_body', store: 'store_body', event: 'event_body',
     policy: 'policy_body', flow: 'flow_body',
+    model: 'model_body', prompt: 'prompt_body', router: 'router_body',
+    tier: 'router_tier_body',
   };
   return map[current] ?? 'system_body';
 }
@@ -213,6 +232,10 @@ connection.onCompletion((params: CompletionParams): CompletionItem[] => {
   const entityNames = [...sym.entities.keys()].map(n => ({ label: n, kind: CompletionItemKind.Class, detail: 'entity' }));
   const eventNames = [...sym.events.keys()].map(n => ({ label: n, kind: CompletionItemKind.Event, detail: 'event' }));
   const capNames = [...sym.capabilities.keys()].map(n => ({ label: n, kind: CompletionItemKind.Function, detail: 'capability' }));
+  // Cognition Layer references — used by prompt bodies (model:/router:),
+  // capability `cognition:` bindings, and tier model refs.
+  const modelNames = [...sym.models.keys()].map(n => ({ label: n, kind: CompletionItemKind.Class, detail: 'model' }));
+  const routerNames = [...sym.routers.keys()].map(n => ({ label: n, kind: CompletionItemKind.Module, detail: 'router' }));
 
   switch (ctx) {
     case 'top_level': return [{ label: 'system', kind: CompletionItemKind.Keyword, insertText: 'system ${1:Name} {\n  domain: ${2:saas_platform}\n\n  $0\n}', insertTextFormat: 2 }];
@@ -226,6 +249,16 @@ connection.onCompletion((params: CompletionParams): CompletionItem[] => {
       { label: 'flow', kind: CompletionItemKind.Struct, insertText: 'flow ${1:name} {\n  step ${2:first}: ${3:action}($4)\n    compensate: ${5:undo}($6)\n  step ${7:second}: ${8:action2}($9)\n    compensate: ${10:undo2}($11)\n}', insertTextFormat: 2 },
       { label: 'constraint', kind: CompletionItemKind.Constant, insertText: 'constraint ${1:name}: ${0}', insertTextFormat: 2 },
       { label: 'extension_point', kind: CompletionItemKind.Interface, insertText: 'extension_point ${1:name}(${2:param}: ${3:Type}) {\n  returns: ${4:void}\n  stable: true\n}', insertTextFormat: 2 },
+      // Cognition Layer (Phase 1+) — model / prompt / router top-level decls.
+      { label: 'model', kind: CompletionItemKind.Class,
+        insertText: 'model ${1:ModelName} {\n  provider: ${2|ollama,openai_compat,llamacpp,koboldcpp,http|}\n  name: "${3:qwen2.5:1.5b}"\n  context_window: ${4:8000}\n  max_output: ${5:512}\n  temperature: ${6:0.0}\n  cost_class: ${7|tiny,small,medium,large|}\n  latency_class: ${8|fast,medium,slow|}\n}',
+        insertTextFormat: 2 },
+      { label: 'prompt', kind: CompletionItemKind.Function,
+        insertText: 'prompt ${1:name}(${2:input}: ${3:string}) {\n  model: ${4:ModelName}\n  template: "extension_point:${5:tmpl_name}"\n  returns: ${6:string}\n  validate: ${7|none,schema_only,ast_compiles|}\n  on_invalid: ${8|fail,retry,retry_with_repair_prompt,escalate|}\n  timeout: ${9:5s}\n}',
+        insertTextFormat: 2 },
+      { label: 'router', kind: CompletionItemKind.Module,
+        insertText: 'router ${1:name} {\n  by: input.${2:complexity}\n  tier ${3:cheap} { max: ${4:0.5} -> ${5:Tiny} }\n  tier ${6:rest}  {           -> ${7:Big} }\n  on_low_confidence: escalate\n  confidence_threshold: 0.65\n}',
+        insertTextFormat: 2 },
       ...entityNames, ...eventNames,
     ];
     case 'entity_body': return [
@@ -248,6 +281,14 @@ connection.onCompletion((params: CompletionParams): CompletionItem[] => {
       { label: 'retry', kind: CompletionItemKind.Keyword, insertText: 'retry: { max_attempts: ${1:3}, backoff: ${2|exponential,linear,fixed|}, interval: ${3:1s} }', insertTextFormat: 2 },
       { label: 'pipeline', kind: CompletionItemKind.Keyword, insertText: 'pipeline: {\n  ${1:step}($2)\n  on_error: rollback\n}', insertTextFormat: 2 },
       { label: 'algorithm', kind: CompletionItemKind.Keyword, insertText: 'algorithm: ${1|shortest_path,rank_by,percentile,bipartite_matching,round_robin,consistent_hash,binary_search,topological_sort,weighted_average|}', insertTextFormat: 2 },
+      // Cognition Layer — `cognition: <name> using { ... }` modifier on a capability.
+      // The catalog list mirrors compiler/src/cognition_catalog.ts; T028 in the
+      // type checker rejects names not in this closed set.
+      { label: 'cognition', kind: CompletionItemKind.Keyword,
+        insertText: 'cognition: ${1|compress_context,semantic_slice,route_by_complexity,tool_select,self_critique,vote,judge_pairwise,argmax_score,consensus_check,repair_with_diff,decompose_task,escalate_model|} using {\n  ${2:param}: ${3:value}\n}',
+        insertTextFormat: 2,
+        documentation: { kind: MarkupKind.Markdown, value: 'Cognition Layer modifier. Dispatches the capability to a closed catalog primitive defined in `compiler/src/cognition_catalog.ts`.' },
+      },
       ...eventNames,
     ];
     case 'channel_body': return [
@@ -279,6 +320,63 @@ connection.onCompletion((params: CompletionParams): CompletionItem[] => {
     case 'flow_body': return [
       { label: 'step', kind: CompletionItemKind.Keyword, insertText: 'step ${1:name}: ${2:capability}($3)\n  compensate: ${4:undo}($5)', insertTextFormat: 2 },
       ...capNames,
+    ];
+    // ─── Cognition Layer (Phase 1+) ───────────────────────────────────────
+    case 'model_body': return [
+      { label: 'provider', kind: CompletionItemKind.Keyword, insertText: 'provider: ${1|ollama,openai_compat,llamacpp,koboldcpp,http|}', insertTextFormat: 2,
+        documentation: { kind: MarkupKind.Markdown, value: '**provider** — Backend protocol. `openai_compat` covers vLLM / LM Studio / text-gen-webui / OpenAI itself.' } },
+      { label: 'name', kind: CompletionItemKind.Keyword, insertText: 'name: "${1:qwen2.5:1.5b}"', insertTextFormat: 2,
+        documentation: { kind: MarkupKind.Markdown, value: '**name** — Provider-specific model identifier. For ollama: `qwen2.5:1.5b` etc.' } },
+      { label: 'endpoint', kind: CompletionItemKind.Keyword, insertText: 'endpoint: "${1:http://127.0.0.1:8080/v1}"', insertTextFormat: 2,
+        documentation: { kind: MarkupKind.Markdown, value: '**endpoint** — Required for openai_compat / llamacpp / koboldcpp / http. SSRF guard restricts to loopback / RFC1918 unless `LLM_ENDPOINT_ALLOWLIST` opts in.' } },
+      { label: 'context_window', kind: CompletionItemKind.Keyword, insertText: 'context_window: ${1:8000}', insertTextFormat: 2 },
+      { label: 'max_output', kind: CompletionItemKind.Keyword, insertText: 'max_output: ${1:512}', insertTextFormat: 2 },
+      { label: 'temperature', kind: CompletionItemKind.Keyword, insertText: 'temperature: ${1:0.0}', insertTextFormat: 2,
+        documentation: { kind: MarkupKind.Markdown, value: '**temperature** — Default 0.0 for deterministic-friendly behaviour.' } },
+      { label: 'top_p', kind: CompletionItemKind.Keyword, insertText: 'top_p: ${1:1.0}', insertTextFormat: 2 },
+      { label: 'stop', kind: CompletionItemKind.Keyword, insertText: 'stop: ["${1:</end>}"]', insertTextFormat: 2 },
+      { label: 'cost_class', kind: CompletionItemKind.Keyword, insertText: 'cost_class: ${1|tiny,small,medium,large|}', insertTextFormat: 2,
+        documentation: { kind: MarkupKind.Markdown, value: '**cost_class** — Used by `LLM_BUDGET_USD_PER_TRACE` to map calls to cost.' } },
+      { label: 'latency_class', kind: CompletionItemKind.Keyword, insertText: 'latency_class: ${1|fast,medium,slow|}', insertTextFormat: 2 },
+      { label: 'vram_mb', kind: CompletionItemKind.Keyword, insertText: 'vram_mb: ${1:4096}', insertTextFormat: 2 },
+      { label: 'quant', kind: CompletionItemKind.Keyword, insertText: 'quant: "${1:Q4_K_M}"', insertTextFormat: 2 },
+    ];
+    case 'prompt_body': return [
+      { label: 'model', kind: CompletionItemKind.Keyword, insertText: 'model: ${1:ModelName}', insertTextFormat: 2,
+        documentation: { kind: MarkupKind.Markdown, value: '**model** — Static model reference. Use either `model:` or `router:`, never both.' } },
+      { label: 'router', kind: CompletionItemKind.Keyword, insertText: 'router: ${1:RouterName}', insertTextFormat: 2,
+        documentation: { kind: MarkupKind.Markdown, value: '**router** — Dynamic dispatch via a declared `router`. Mutually exclusive with `model:`.' } },
+      { label: 'template', kind: CompletionItemKind.Keyword, insertText: 'template: "extension_point:${1:tmpl_name}"', insertTextFormat: 2,
+        documentation: { kind: MarkupKind.Markdown, value: '**template** — Either an inline string or `extension_point:NAME`. Extension-point bodies survive recompilation.' } },
+      { label: 'returns', kind: CompletionItemKind.Keyword, insertText: 'returns: ${1:string}', insertTextFormat: 2 },
+      { label: 'validate', kind: CompletionItemKind.Keyword, insertText: 'validate: ${1|none,schema_only,ast_compiles|}', insertTextFormat: 2,
+        documentation: { kind: MarkupKind.Markdown, value: '**validate** — `schema_only` (Zod against `returns:`), `ast_compiles` (tsc parse), or `custom: <extension_point>`.' } },
+      { label: 'on_invalid', kind: CompletionItemKind.Keyword, insertText: 'on_invalid: ${1|fail,retry,retry_with_repair_prompt,escalate|}', insertTextFormat: 2,
+        documentation: { kind: MarkupKind.Markdown, value: '**on_invalid** — Recovery action when validation fails. `escalate` only valid when `router:` is set.' } },
+      { label: 'retry', kind: CompletionItemKind.Keyword, insertText: 'retry: { max_attempts: ${1:3}, backoff: ${2|fixed,linear,exponential|}, interval: ${3:200ms} }', insertTextFormat: 2 },
+      { label: 'timeout', kind: CompletionItemKind.Keyword, insertText: 'timeout: ${1:5s}', insertTextFormat: 2 },
+      { label: 'cache', kind: CompletionItemKind.Keyword, insertText: 'cache: { key: hash(${1:input}), ttl: ${2:1h} }', insertTextFormat: 2,
+        documentation: { kind: MarkupKind.Markdown, value: '**cache** — Optional Postgres-backed cache keyed by `key:` expression + model + template hash.' } },
+      { label: 'idempotent', kind: CompletionItemKind.Keyword, insertText: 'idempotent: ${1|true,false|}', insertTextFormat: 2 },
+      { label: 'constraints', kind: CompletionItemKind.Keyword, insertText: 'constraints: [${1:output.length <= 1000}]', insertTextFormat: 2 },
+      { label: 'tools', kind: CompletionItemKind.Keyword, insertText: 'tools: [${1:capability_name}]', insertTextFormat: 2,
+        documentation: { kind: MarkupKind.Markdown, value: '**tools** — Closed list of capability names this prompt is allowed to call. Default empty.' } },
+      ...modelNames, ...routerNames,
+    ];
+    case 'router_body': return [
+      { label: 'by', kind: CompletionItemKind.Keyword, insertText: 'by: input.${1:complexity}', insertTextFormat: 2,
+        documentation: { kind: MarkupKind.Markdown, value: '**by** — Routing key expression. The leading `input.` is stripped at compile time.' } },
+      { label: 'tier', kind: CompletionItemKind.Keyword, insertText: 'tier ${1:name} { max: ${2:0.5} -> ${3:Model} }', insertTextFormat: 2,
+        documentation: { kind: MarkupKind.Markdown, value: '**tier** — One ordered tier in the decision tree. The last tier omits `max:` and acts as the default.' } },
+      { label: 'on_low_confidence', kind: CompletionItemKind.Keyword, insertText: 'on_low_confidence: ${1|fail,escalate,retry|}', insertTextFormat: 2 },
+      { label: 'confidence_threshold', kind: CompletionItemKind.Keyword, insertText: 'confidence_threshold: ${1:0.65}', insertTextFormat: 2,
+        documentation: { kind: MarkupKind.Markdown, value: '**confidence_threshold** — Below this, the prompt body throws a low_confidence error and the on_invalid: path takes over.' } },
+      { label: 'fallback', kind: CompletionItemKind.Keyword, insertText: 'fallback: ${1:Model}', insertTextFormat: 2 },
+      ...modelNames,
+    ];
+    case 'router_tier_body': return [
+      { label: 'max', kind: CompletionItemKind.Keyword, insertText: 'max: ${1:0.5} -> ${2:Model}', insertTextFormat: 2 },
+      ...modelNames,
     ];
     case 'field_type': return TYPE_ITEMS;
     default: return TYPE_ITEMS;
@@ -322,6 +420,49 @@ const KEYWORD_DOCS: Record<string, string> = {
   bipartite_matching: '**bipartite_matching** — Hopcroft-Karp maximum matching.',
   round_robin: '**round_robin** — Cyclic assignment of items to workers.',
   consistent_hash: '**consistent_hash** — Consistent hashing for key distribution.',
+
+  // ─── Cognition Layer (Phase 1+) ──────────────────────────────────────────
+  model: '**model** — Declares a model adapter and its budget envelope. Required: `provider`, `name`. The compiler emits a typed registry entry; provider adapters live in `src/providers/`.',
+  prompt: '**prompt** — Declares a typed prompt with execution policy: model/router, template, return type, validation, retry, timeout, cache, and allowed tools. The compiled body wraps a deterministic chat call with structured tracing.',
+  router: '**router** — Declares a deterministic decision tree for model dispatch. Tiers are evaluated in order against `by:`; the last tier is the default. No dynamic dispatch.',
+  cognition: '**cognition** — Capability modifier that dispatches to the closed cognition catalog (see `compiler/src/cognition_catalog.ts`). Like `algorithm:`, names are validated at compile time (T028).',
+  provider: '**provider** — Backend protocol. One of: `ollama`, `openai_compat`, `llamacpp`, `koboldcpp`, `http`. Adapters honour `AbortSignal` and the SSRF allowlist.',
+  endpoint: '**endpoint** — Required for `openai_compat`, `llamacpp`, `koboldcpp`, and `http`. Default policy allows loopback + RFC1918 only; opt in via `LLM_ENDPOINT_ALLOWLIST`.',
+  template: '**template** — Either an inline string or `extension_point:NAME`. Extension-point bodies survive recompilation, so prompt wording is owned by humans.',
+  tier: '**tier** — One ordered tier in a router decision tree. Non-default tiers must declare `max:` and arrow to a model; the last tier omits `max:` and acts as the default.',
+  validate: '**validate** — Output validation mode. `none` (accept), `schema_only` (Zod against `returns:`), `ast_compiles` (tsc parse), or `custom: <extension_point>`.',
+  on_invalid: '**on_invalid** — Recovery action when validation fails. `fail` (raise), `retry` (same prompt), `retry_with_repair_prompt` (smaller bounded retry), or `escalate` (next tier; requires router).',
+  cache: '**cache** — Optional Postgres-backed cache. Key is `key:` expression hashed with model id and template hash; default `key` is a canonical input hash.',
+  tools: '**tools** — Closed list of capability names this prompt is allowed to call. Default empty. The model never picks a tool not on this list.',
+  confidence_threshold: '**confidence_threshold** — Below this, the prompt body throws a low_confidence error and the on_invalid: path takes over.',
+  on_low_confidence: '**on_low_confidence** — Action when a routed call returns confidence below the threshold. `escalate` moves up one tier.',
+  context_window: '**context_window** — Token budget for the model input. The compressor uses this to size prompts against the model.',
+  max_output: '**max_output** — Cap on completion tokens.',
+  cost_class: '**cost_class** — One of `tiny | small | medium | large`. Used by the budget tracker to map calls to USD.',
+  latency_class: '**latency_class** — One of `fast | medium | slow`. Used by routers and observability.',
+  ollama: '**ollama** — Local Ollama server (`/api/chat`). Default host: `OLLAMA_HOST` (`http://127.0.0.1:11434`). No logprobs.',
+  openai_compat: '**openai_compat** — OpenAI-compatible `/v1/chat/completions`. Covers vLLM, LM Studio, text-gen-webui, KoboldCPP\'s OAI shim, and OpenAI itself. Confidence derived from logprobs when the server returns them.',
+  llamacpp: '**llamacpp** — llama.cpp `/completion`. Confidence derived from `completion_probabilities` (n_probs=1).',
+  koboldcpp: '**koboldcpp** — Native KoboldCPP `/api/v1/generate`. No confidence.',
+  http: '**http** — Generic JSON POST. Pass-through for any `confidence` field on the response.',
+  schema_only: '**schema_only** — Validate the parsed model output against the prompt\'s `returns:` type via Zod. Cheapest meaningful validation.',
+  ast_compiles: '**ast_compiles** — Treat the model output as code and parse it with tsc. Use for code-generation prompts.',
+  retry_with_repair_prompt: '**retry_with_repair_prompt** — On invalid output, call a smaller bounded repair prompt (single-shot). Re-validates the repaired output before returning.',
+  escalate: '**escalate** — Move up one tier in the prompt\'s router. Bounded — at most one escalation per pipeline (tracked in span metadata).',
+  by: '**by** — Routing-key expression in a `router`. The leading `input.` segment is stripped at compile time, so `input.complexity` reads `complexity` off the input object.',
+  using: '**using** — Bind values to a cognition-catalog primitive\'s inputs. Required parameters must all be bound.',
+  compress_context: '**compress_context** — Reduce a conversation history or document body to fit a target token budget. `summarize_oldest` (default), `drop_oldest`, or `hierarchical_summarize`.',
+  semantic_slice: '**semantic_slice** — Bounded graph-based retrieval. Walks the symbol/dependency graph to `hop_depth`, capped at `max_files`. Never dumps the whole repo.',
+  route_by_complexity: '**route_by_complexity** — Thin wrapper around a declared `router`. Resolves the routing input to a model id.',
+  tool_select: '**tool_select** — Constrained tool selection from a closed list. Returns `null` on invalid pick.',
+  self_critique: '**self_critique** — Validator-model critique of a prior output against declared criteria. Returns `{ ok, issues }`.',
+  vote: '**vote** — Majority vote over candidates. Earliest-index tie-breaking. Pure (no model).',
+  judge_pairwise: '**judge_pairwise** — Pick the better of two candidates by asking a judge model. Falls back to `a` on ambiguous output.',
+  argmax_score: '**argmax_score** — Deterministic argmax over scored items. Earliest-index tie-breaking. Pure.',
+  consensus_check: '**consensus_check** — Agreement detector across N parallel results. Returns `{ agree, disagreement_score }`. Pure.',
+  repair_with_diff: '**repair_with_diff** — Bounded single-shot repair: smaller scope, fewer tokens. Use as the body of `on_invalid: retry_with_repair_prompt`.',
+  decompose_task: '**decompose_task** — Decompose a task into subtasks drawn from a closed list of allowed kinds. Subtasks outside the list are dropped.',
+  escalate_model: '**escalate_model** — Move up one tier in a router with an audit row. Throws if already at the top tier.',
 };
 
 connection.onHover((params: TextDocumentPositionParams): Hover | null => {
@@ -383,6 +524,77 @@ connection.onHover((params: TextDocumentPositionParams): Hover | null => {
     return { contents: { kind: MarkupKind.Markdown, value: `**channel ${word}**\n\n**transport:** ${(channel as any).transport || 'websocket'}\n\n**ordering:** ${(channel as any).ordering || 'fifo'}\n\n**persistence:** ${(channel as any).persistence || 'none'}` } };
   }
 
+  // ─── Cognition Layer hovers ─────────────────────────────────────────────
+  const model = sym.models.get(word);
+  if (model) {
+    const m = model as any;
+    const lines = [
+      `**model ${word}**`,
+      ``,
+      `**provider:** \`${m.provider}\``,
+      `**name:** \`${m.modelName ?? m.name_lit ?? '?'}\``,
+    ];
+    if (m.endpoint) lines.push(`**endpoint:** \`${m.endpoint}\``);
+    if (typeof m.contextWindow === 'number') lines.push(`**context_window:** ${m.contextWindow}`);
+    if (typeof m.maxOutput === 'number') lines.push(`**max_output:** ${m.maxOutput}`);
+    if (m.costClass) lines.push(`**cost_class:** \`${m.costClass}\``);
+    if (m.latencyClass) lines.push(`**latency_class:** \`${m.latencyClass}\``);
+    return { contents: { kind: MarkupKind.Markdown, value: lines.join('\n\n') } };
+  }
+
+  const prompt = sym.prompts.get(word);
+  if (prompt) {
+    const p = prompt as any;
+    const ps = (p.params || []).map((pa: any) => {
+      const t = pa.type.kind === 'PrimitiveType' ? pa.type.name
+        : pa.type.kind === 'EntityRefType' ? pa.type.name : '...';
+      return `${pa.name}: ${t}`;
+    }).join(', ');
+    const lines = [
+      `**prompt ${word}**(${ps})`,
+      ``,
+      p.modelRef ? `**model:** \`${p.modelRef}\`` : (p.routerRef ? `**router:** \`${p.routerRef}\`` : ''),
+    ];
+    if (p.template) lines.push(`**template:** \`${p.template.kind === 'ExtensionPointTemplate' ? `extension_point:${p.template.name}` : 'inline'}\``);
+    if (p.validate) lines.push(`**validate:** \`${p.validate.kind ?? p.validate}\``);
+    if (p.onInvalid) lines.push(`**on_invalid:** \`${p.onInvalid}\``);
+    if (p.timeout) lines.push(`**timeout:** ${typeof p.timeout === 'object' ? JSON.stringify(p.timeout) : p.timeout}`);
+    if (p.cache) lines.push(`**cache:** declared`);
+    return { contents: { kind: MarkupKind.Markdown, value: lines.filter(Boolean).join('\n\n') } };
+  }
+
+  const router = sym.routers.get(word);
+  if (router) {
+    const r = router as any;
+    const tiers = (r.tiers || []).map((t: any) => {
+      const max = t.max === null || t.max === undefined ? 'default' : `max ${t.max}`;
+      return `  - **${t.name}** (${max}) → \`${t.modelRef}\``;
+    });
+    const lines = [
+      `**router ${word}**`,
+      ``,
+      r.byExpr ? `**by:** \`${typeof r.byExpr === 'string' ? r.byExpr : '...'}\`` : '',
+      `**tiers:**`,
+      ...tiers,
+    ];
+    if (typeof r.confidenceThreshold === 'number') lines.push(`**confidence_threshold:** ${r.confidenceThreshold}`);
+    if (r.onLowConfidence) lines.push(`**on_low_confidence:** \`${r.onLowConfidence}\``);
+    if (r.fallbackModelRef) lines.push(`**fallback:** \`${r.fallbackModelRef}\``);
+    return { contents: { kind: MarkupKind.Markdown, value: lines.filter(Boolean).join('\n') } };
+  }
+
+  const extPoint = sym.extensionPoints.get(word);
+  if (extPoint) {
+    const e = extPoint as any;
+    const ps = (e.params || []).map((pa: any) => {
+      const t = pa.type.kind === 'PrimitiveType' ? pa.type.name
+        : pa.type.kind === 'EntityRefType' ? pa.type.name : '...';
+      return `${pa.name}: ${t}`;
+    }).join(', ');
+    const ret = e.returns ? (e.returns.kind === 'PrimitiveType' ? e.returns.name : '...') : 'void';
+    return { contents: { kind: MarkupKind.Markdown, value: `**extension_point ${word}**(${ps}) → \`${ret}\`\n\n**stable:** ${e.stable ? 'true' : 'false'}\n\nThe body is preserved across recompilation via sentinel-bracketed regions in the generated file.` } };
+  }
+
   return null;
 });
 
@@ -395,7 +607,11 @@ connection.onDefinition((params: TextDocumentPositionParams): Location | null =>
   if (!word) return null;
   const sym = symbolCache.get(params.textDocument.uri);
   if (!sym) return null;
-  const maps = [sym.entities, sym.capabilities, sym.events, sym.stores, sym.channels];
+  const maps = [
+    sym.entities, sym.capabilities, sym.events, sym.stores, sym.channels,
+    // Cognition Layer (Phase 1+) — go-to-definition for new decl kinds.
+    sym.models, sym.prompts, sym.routers, sym.extensionPoints,
+  ];
   for (const map of maps) {
     const node = (map as Map<string, AST.ASTNode>).get(word);
     if (node) {
@@ -421,6 +637,10 @@ connection.onDocumentSymbol((params: DocumentSymbolParams): DocumentSymbol[] => 
       ChannelDecl: SymbolKind.Interface, FlowDecl: SymbolKind.Struct,
       PolicyDecl: SymbolKind.Property, ConstraintDecl: SymbolKind.Constant,
       ExtensionPointDecl: SymbolKind.Interface,
+      // Cognition Layer (Phase 1+).
+      ModelDecl: SymbolKind.Class,
+      PromptDecl: SymbolKind.Function,
+      RouterDecl: SymbolKind.Module,
     };
     for (const decl of sys.declarations) {
       const kind = kindMap[decl.kind];
@@ -711,9 +931,14 @@ connection.onPrepareRename((params: PrepareRenameParams) => {
   const sym = symbolCache.get(params.textDocument.uri);
   if (!sym) return null;
 
-  // Only allow renaming user-defined symbols
+  // Only allow renaming user-defined symbols. Cognition decls (model / prompt
+  // / router / extension_point) are renameable too — references on the
+  // right-hand side of `model:`, `router:`, and `template: extension_point:`
+  // are picked up by the same `\bname\b` pass we use for the older kinds.
   const isDefined = sym.entities.has(word) || sym.capabilities.has(word) ||
-    sym.events.has(word) || sym.stores.has(word) || sym.channels.has(word);
+    sym.events.has(word) || sym.stores.has(word) || sym.channels.has(word) ||
+    sym.models.has(word) || sym.prompts.has(word) || sym.routers.has(word) ||
+    sym.extensionPoints.has(word);
   if (!isDefined) return null;
 
   // Return the range of the word at cursor
@@ -738,7 +963,9 @@ connection.onRenameRequest((params: RenameParams): WorkspaceEdit | null => {
 
   // Verify it's a renameable symbol
   const isDefined = sym.entities.has(oldName) || sym.capabilities.has(oldName) ||
-    sym.events.has(oldName) || sym.stores.has(oldName) || sym.channels.has(oldName);
+    sym.events.has(oldName) || sym.stores.has(oldName) || sym.channels.has(oldName) ||
+    sym.models.has(oldName) || sym.prompts.has(oldName) || sym.routers.has(oldName) ||
+    sym.extensionPoints.has(oldName);
   if (!isDefined) return null;
 
   // Find all occurrences of the word in the document

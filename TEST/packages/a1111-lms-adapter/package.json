@@ -1,0 +1,52 @@
+{
+  "name": "a1111-lms-adapter",
+  "version": "0.1.0",
+  "description": "TypeScript adapter that wraps AUTOMATIC1111's Stable Diffusion Web UI HTTP API while routing prompts through LM Studio (or any OpenAI-compatible chat endpoint) for prompt enhancement first.",
+  "main": "dist/index.js",
+  "module": "dist-esm/index.js",
+  "types": "dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist-esm/index.js",
+      "require": "./dist/index.js"
+    }
+  },
+  "files": [
+    "dist",
+    "dist-esm",
+    "src",
+    "README.md",
+    "LICENSE"
+  ],
+  "scripts": {
+    "build": "tsc -p tsconfig.build.json && tsc -p tsconfig.esm.json && node -e \"require('fs').writeFileSync('dist-esm/package.json', JSON.stringify({type:'module'}, null, 2))\"",
+    "test": "node --experimental-strip-types --test test/adapter.test.ts",
+    "typecheck": "tsc --noEmit",
+    "example:txt2img": "node --experimental-strip-types examples/txt2img.ts",
+    "example:img2img": "node --experimental-strip-types examples/img2img.ts",
+    "prepublishOnly": "npm run typecheck && npm run build"
+  },
+  "keywords": [
+    "stable-diffusion",
+    "automatic1111",
+    "a1111",
+    "lm-studio",
+    "lmstudio",
+    "prompt-enhancement",
+    "openai-compatible",
+    "typescript",
+    "adapter"
+  ],
+  "license": "MIT",
+  "engines": {
+    "node": ">=18.0.0"
+  },
+  "devDependencies": {
+    "@types/node": "20.11.30",
+    "typescript": "5.5.3"
+  },
+  "publishConfig": {
+    "access": "public"
+  }
+}

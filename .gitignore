@@ -39,10 +39,21 @@ compiler/src/*.py
 .env
 .env.local
 .env.*.local
-# Generated project .env files (contain local DB credentials and secrets)
+# --- Generated project .env files (contain local DB credentials and secrets)
 examples/**/.env
 examples/**/output/.env
 examples/marketplace/output/.env
+TEST/output/.env
+
+# --- MarrowForge runtime caches ---------------------------------------------
+# Phase 9 repo-clone sandbox + Phase 12 on-disk ForgeResult save target.
+.forge-cache/
+TEST/output/.forge-cache/
+
+# --- MarrowForge UI build artifacts -----------------------------------------
+TEST/ui/node_modules/
+TEST/ui/dist/
+TEST/ui/*.tsbuildinfo
 
 # --- Logs --------------------------------------------------------------------
 *.log

@@ -1,0 +1,174 @@
+// MarrowScript LLM Harness — issue triage example
+//
+// Input: a free-text issue / ticket
+// Output: a typed classification + a short summary, optionally with a
+//         routing hint when the model isn't confident enough.
+//
+// What this demonstrates:
+//   - Two declared models, one tier ladder
+//   - One classification prompt with `validate: schema_only` and a small
+//     retry budget (cheap and idempotent)
+//   - One summarization prompt that escalates to the larger model when
+//     the small one returns low-confidence output
+//   - Explicit `cache:` on both prompts so identical input is free
+//   - A pipeline capability that runs both prompts deterministically
+//   - No tool calls, no agents, no recursive prompts. Every loop is a
+//     compile-time pipeline.
+//
+// Compile with: marrowc compile triage_harness.marrow
+// The output tree includes:
+//   - src/cognition/{router,prompts,primitives,index}.ts
+//   - src/providers/{types,ssrf_guard,ollama,openai_compat,index}.ts
+//   - src/cognition/{validate,cache,budget,traces}.ts
+//   - migrations/{prompt_cache,cognition_traces,...}.sql
+
+system TriageHarness {
+  domain: cognitive_scaffold
+
+  // ─── Entities ────────────────────────────────────────────────────────────
+
+  entity Ticket {
+    owns: [
+      title: string,
+      body: string,
+      kind: string,
+      summary: string,
+      complexity: float
+    ]
+    constraints: [
+      kind in ["bug", "feature", "question", "support", "spam"]
+    ]
+  }
+
+  // ─── Stores ──────────────────────────────────────────────────────────────
+
+  store TicketStore {
+    engine: postgresql
+    schema: {
+      id: uuid,
+      title: string,
+      body: string,
+      kind: string,
+      summary: string,
+      complexity: float,
+      created_at: timestamp,
+      updated_at: timestamp
+    }
+  }
+
+  // ─── Extension points (prompt bodies live here) ──────────────────────────
+
+  extension_point tmpl_classify(title: string, body: string) {
+    returns: string
+    stable: true
+  }
+
+  extension_point tmpl_summarize(title: string, body: string, max_tokens: uint) {
+    returns: string
+    stable: true
+  }
+
+  // ─── Models ──────────────────────────────────────────────────────────────
+
+  model Tiny {
+    provider: ollama
+    name: "qwen2.5-coder:1.5b"
+    context_window: 32000
+    max_output: 256
+    temperature: 0.0
+    cost_class: tiny
+    latency_class: fast
+  }
+
+  model Small {
+    provider: openai_compat
+    endpoint: "http://127.0.0.1:8080/v1"
+    name: "phi-3.5-mini"
+    context_window: 128000
+    max_output: 1024
+    temperature: 0.0
+    cost_class: small
+    latency_class: medium
+  }
+
+  // ─── Router ──────────────────────────────────────────────────────────────
+
+  // The classifier always uses Tiny. The summarizer routes by complexity:
+  // short tickets get Tiny (fast + free), longer ones get Small.
+  // If confidence drops below 0.65 on Tiny, the prompt body escalates to Small.
+  router by_size {
+    by: input.complexity
+    tier short { max: 0.4 -> Tiny }
+    tier long  {           -> Small }
+    on_low_confidence: escalate
+    confidence_threshold: 0.65
+  }
+
+  // ─── Prompts ─────────────────────────────────────────────────────────────
+
+  prompt classify_ticket(title: string, body: string) {
+    model: Tiny
+    template: "extension_point:tmpl_classify"
+    returns: string
+    timeout: 5s
+    idempotent: true
+    validate: schema_only
+    on_invalid: retry
+    retry: { max_attempts: 2, backoff: fixed, interval: 200ms }
+    cache: { key: hash(body), ttl: 1h }
+  }
+
+  prompt summarize_ticket(title: string, body: string, complexity: float, max_tokens: uint) {
+    router: by_size
+    template: "extension_point:tmpl_summarize"
+    returns: string
+    timeout: 30s
+    idempotent: true
+    validate: schema_only
+    on_invalid: escalate
+    retry: { max_attempts: 2, backoff: exponential, interval: 1s }
+    constraints: [
+      output.length <= max_tokens
+    ]
+    cache: { key: hash(body), ttl: 1h }
+  }
+
+  // ─── Capabilities (deterministic orchestration) ──────────────────────────
+
+  // Persisting capabilities — the classification and summary fields on the
+  // ticket get written through the existing transactional path.
+  capability assign_kind(t: Ticket, kind: string) {
+    requires: [
+      kind in ["bug", "feature", "question", "support", "spam"]
+    ]
+    effects: [t.kind = kind]
+    sync: transactional
+  }
+
+  capability set_summary(t: Ticket, summary: string) {
+    effects: [t.summary = summary]
+    sync: transactional
+  }
+
+  // Compile-time pipeline. Calls each prompt in order; rolls back if any step
+  // fails. There is no runtime agent loop — the compiler emits a typed DAG.
+  capability triage(t: Ticket) {
+    pipeline: {
+      classify_ticket(t.title, t.body) as kind
+      summarize_ticket(t.title, t.body, t.complexity, 256) as summary
+      assign_kind(t, kind)
+      set_summary(t, summary)
+      on_error: rollback
+    }
+    sync: transactional
+    timeout: 1m
+  }
+
+  // ─── Policy (existing audit + rate limit, gets cognition_traces for free) ─
+
+  policy harness {
+    rate_limit: 60 per 1m
+    audit: true
+    encryption: in_transit
+  }
+}

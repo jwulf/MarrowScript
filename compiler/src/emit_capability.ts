@@ -1,5 +1,5 @@
 /**
- * BoneScript Capability Body Emitter
+ * MarrowScript Capability Body Emitter
  *
  * Translates IR effects and preconditions into real TypeScript + SQL.
  */

@@ -511,7 +511,17 @@ export function parseCognition(s: TokenStream): AST.CognitionNode {
   if (s.match(TokenKind.KwUsing)) {
     s.expect(TokenKind.LBrace, "{");
     while (!s.check(TokenKind.RBrace) && !s.check(TokenKind.EOF)) {
-      const param = s.expect(TokenKind.Identifier, "param name").value;
+      // Allow keywords as param names (e.g. "input", "history", "strategy")
+      // since cognition binding params are user-chosen labels.
+      const paramTok = s.peek();
+      let param: string;
+      if (paramTok.kind === TokenKind.Identifier) {
+        param = s.advance().value;
+      } else if (paramTok.value && /^[a-zA-Z_][a-zA-Z0-9_]*$/.test(paramTok.value) && paramTok.kind !== TokenKind.EOF) {
+        param = s.advance().value;
+      } else {
+        param = s.expect(TokenKind.Identifier, "param name").value;
+      }
       s.expect(TokenKind.Colon, ":");
       const value = parseExpr(s);
       using.push({ param, value });

@@ -1,9 +1,9 @@
-# BoneScript Formal Grammar
+# MarrowScript Formal Grammar
 # Notation: PEG (Parsing Expression Grammar)
 # Reference: Bryan Ford, "Parsing Expression Grammars" (2004)
 #
 # This grammar is the SINGLE SOURCE OF TRUTH for what constitutes
-# a syntactically valid BoneScript program. No input that does not match
+# a syntactically valid MarrowScript program. No input that does not match
 # this grammar is a valid program.
 #
 # Properties:

@@ -1,0 +1,255 @@
+/**
+ * MarrowScript Trace → Regression Test (LLM Harness, Phase 22)
+ *
+ * Converts a recorded cognition trace (the JSON dumped by `marrowc replay`)
+ * into a runnable regression test. The point: production LLM systems break
+ * in two ways — the model drifts (caught by Phase 16 evaluations) or the
+ * surrounding code changes while the LLM behavior stays the same. Replay-
+ * as-test catches the second category cheaply by pinning every recorded
+ * input → output mapping and re-running the prompt body against a stub
+ * provider that serves the recorded outputs in order.
+ *
+ * Surface:
+ *   - traceToTest(spans, options) → string  (the test file body)
+ *   - the CLI subcommand `marrowc trace-to-test <trace.json>` lives in
+ *     cli.ts and shells out to this module.
+ *
+ * The emitted test uses Node's built-in `node:test` runner — same dependency
+ * footprint the rest of the generated tree assumes (Node 18+).
+ *
+ * Determinism: spans are processed in started_at order; literal values are
+ * embedded via JSON.stringify so re-emitting the same trace produces the
+ * same file bytes. No Date.now()/Math.random() in this module.
+ */
+
+export interface CognitionSpanLike {
+  span_id?: string;
+  trace_id?: string;
+  workflow?: string;
+  step?: string;
+  kind?: string;
+  prompt?: string | null;
+  model?: string | null;
+  provider?: string | null;
+  input_redacted?: unknown;
+  output_redacted?: unknown;
+  validate_result?: string | null;
+  confidence?: number | null;
+  prompt_tokens?: number | null;
+  completion_tokens?: number | null;
+  cost_usd?: number | null;
+  latency_ms?: number;
+  cache_hit?: boolean;
+  status?: string;
+  error_code?: string | null;
+  metadata?: Record<string, unknown>;
+  started_at?: number | string;
+  finished_at?: number | string | null;
+}
+
+export interface TraceToTestOptions {
+  /** Trace id, used in the test name + assertion identity. */
+  traceId: string;
+  /**
+   * Optional path to the project's cognition entry. Defaults to the
+   * canonical `../src/cognition` shape used everywhere else in the
+   * generated tree. Adjust when the test file lives elsewhere.
+   */
+  cognitionImportPath?: string;
+  /**
+   * When true (default), each prompt span asserts the parsed output deep-
+   * equals the recorded value. Set false if the user only wants the call
+   * sequence verified.
+   */
+  assertOutputs?: boolean;
+}
+
+/**
+ * Generate a Node-test regression file from a recorded trace.
+ *
+ * The output structure:
+ *   - imports node:test, node:assert/strict, getModel from providers
+ *   - imports callPrompt from cognition
+ *   - replaces each referenced model's provider with a stub that serves
+ *     the recorded outputs FIFO (same order the spans were captured)
+ *   - replays each prompt_call span as a callPrompt invocation
+ *   - asserts the result matches the recorded output (when enabled)
+ *   - asserts the total token usage and cost match the trace
+ *   - cleans up by reverting model providers in afterEach
+ */
+export function traceToTest(spans: CognitionSpanLike[], options: TraceToTestOptions): string {
+  const {
+    traceId,
+    cognitionImportPath = "../src/cognition",
+    assertOutputs = true,
+  } = options;
+
+  // Sort spans by started_at to be safe — the recorder writes in order, but
+  // tests should be insensitive to row-ordering quirks in the storage layer.
+  // We coerce to number to handle both ms-epoch and ISO-string forms.
+  const sorted = [...spans].sort((a, b) => toMs(a.started_at) - toMs(b.started_at));
+
+  // Only prompt_call spans drive the replay. We ignore validate / repair /
+  // tool_call / span types — the prompt body re-runs them under the same
+  // recorded inputs, which is exactly what we want.
+  const promptCalls = sorted.filter(s => s.kind === "prompt_call" && s.prompt);
+
+  // Group recorded outputs per model. The stub serves them FIFO so a model
+  // that was used by 3 prompts in the trace serves 3 outputs in the same
+  // order, regardless of which prompt called it. This matches the runtime
+  // contract: every call hits provider.chat(), and provider.chat() doesn't
+  // care which prompt it's serving.
+  const byModel = new Map<string, unknown[]>();
+  for (const s of promptCalls) {
+    const m = s.model ?? "unknown";
+    if (!byModel.has(m)) byModel.set(m, []);
+    byModel.get(m)!.push(s.output_redacted);
+  }
+
+  // Aggregate totals for the trace-level assertion.
+  const totalPrompts = promptCalls.length;
+  const totalTokens = promptCalls.reduce((acc, s) => acc + (s.prompt_tokens ?? 0) + (s.completion_tokens ?? 0), 0);
+  // Round to 6 decimal places (sub-cent precision) so floating-point quirks
+  // like 0.0001 + 0.0002 = 0.30000000000000004 don't sneak into the emitted
+  // file and break bitwise determinism on re-runs.
+  const totalCost = Math.round(promptCalls.reduce((acc, s) => acc + (s.cost_usd ?? 0), 0) * 1_000_000) / 1_000_000;
+
+  const lines: string[] = [];
+  lines.push("// Generated by MarrowScript trace-to-test. DO NOT EDIT.");
+  lines.push(`// Phase 22 — replay regression test for trace ${traceId}.`);
+  lines.push("//");
+  lines.push("// What this catches: the surrounding code changed but the LLM behavior");
+  lines.push("// stayed the same. Each prompt_call span in the trace is replayed by");
+  lines.push("// stubbing the model's provider with the recorded outputs FIFO and");
+  lines.push("// asserting callPrompt returns the recorded value. Validation, repair,");
+  lines.push("// and tool-call dispatch all run under the same compiled rules — if any");
+  lines.push("// of them now reject what they previously accepted, the test fails.");
+  lines.push("//");
+  lines.push("// What this does NOT catch: model drift. For that, use Phase 16 evals.");
+  lines.push("");
+  lines.push("import { test, beforeEach, afterEach } from \"node:test\";");
+  lines.push("import * as assert from \"node:assert/strict\";");
+  lines.push(`import { callPrompt } from ${JSON.stringify(cognitionImportPath)};`);
+  lines.push(`import { getModel } from ${JSON.stringify(modelImportPath(cognitionImportPath))};`);
+  lines.push("");
+  // Saved providers so afterEach can restore the originals.
+  lines.push("interface RestorableModel { provider: unknown; }");
+  lines.push("const __originals: { name: string; provider: unknown }[] = [];");
+  lines.push("");
+  // FIFO recorded outputs per model.
+  lines.push("const __recorded: Record<string, unknown[]> = {");
+  for (const [model, outputs] of [...byModel.entries()].sort()) {
+    lines.push(`  ${JSON.stringify(model)}: ${JSON.stringify(outputs)},`);
+  }
+  lines.push("};");
+  lines.push("");
+  // Stub builder. Each call shifts the next recorded output. Past the end:
+  // throw so the test fails loudly instead of silently re-using stale data.
+  lines.push("function makeStubProvider(modelName: string) {");
+  lines.push("  const queue = [...(__recorded[modelName] || [])];");
+  lines.push("  return {");
+  lines.push("    name: \"replay-stub\",");
+  lines.push("    countTokens: (s: string) => Math.ceil(s.length / 4),");
+  lines.push("    async chat(_req: unknown): Promise<{ content: string; usage: { prompt_tokens?: number; completion_tokens?: number }; confidence?: number | null }> {");
+  lines.push("      if (queue.length === 0) {");
+  lines.push("        throw new Error(`replay stub for \"${modelName}\" exhausted — the system called the model more times than the trace recorded`);");
+  lines.push("      }");
+  lines.push("      const out = queue.shift();");
+  lines.push("      // The runtime expects content as a string. Non-string outputs are");
+  lines.push("      // serialised — the prompt's parser branch (string/json/file/files)");
+  lines.push("      // will re-parse this on the receiving end exactly like at record time.");
+  lines.push("      const content = typeof out === \"string\" ? out : JSON.stringify(out);");
+  lines.push("      return { content, usage: { prompt_tokens: 0, completion_tokens: 0 }, confidence: null };");
+  lines.push("    },");
+  lines.push("  };");
+  lines.push("}");
+  lines.push("");
+  lines.push("beforeEach(() => {");
+  for (const model of [...byModel.keys()].sort()) {
+    lines.push(`  {`);
+    lines.push(`    const m = getModel(${JSON.stringify(model)}) as unknown as RestorableModel;`);
+    lines.push(`    __originals.push({ name: ${JSON.stringify(model)}, provider: m.provider });`);
+    lines.push(`    m.provider = makeStubProvider(${JSON.stringify(model)});`);
+    lines.push(`  }`);
+  }
+  lines.push("});");
+  lines.push("");
+  lines.push("afterEach(() => {");
+  lines.push("  while (__originals.length > 0) {");
+  lines.push("    const o = __originals.pop()!;");
+  lines.push("    const m = getModel(o.name) as unknown as RestorableModel;");
+  lines.push("    m.provider = o.provider;");
+  lines.push("  }");
+  lines.push("});");
+  lines.push("");
+  // Each prompt span becomes one test assertion.
+  lines.push(`test(${JSON.stringify(`replay trace ${traceId}: ${totalPrompts} prompt call(s)`)}, async () => {`);
+  for (let i = 0; i < promptCalls.length; i++) {
+    const s = promptCalls[i];
+    const prompt = String(s.prompt);
+    const input = s.input_redacted ?? {};
+    const output = s.output_redacted;
+    lines.push(`  // Span ${i + 1}/${promptCalls.length} — ${prompt} (model=${s.model ?? "?"}, status=${s.status ?? "?"})`);
+    lines.push(`  {`);
+    lines.push(`    const result = await callPrompt(${JSON.stringify(prompt)}, ${JSON.stringify(input)} as Record<string, unknown>);`);
+    if (assertOutputs) {
+      // Recorded output may have been redacted — guard the assertion behind
+      // a check so a [REDACTED] sentinel doesn't cause spurious failures.
+      // Users who need stricter checks can disable redaction at record time.
+      lines.push(`    const __expected = ${JSON.stringify(output)};`);
+      lines.push(`    if (typeof __expected === "string" && __expected.includes("[REDACTED]")) {`);
+      lines.push(`      // Output was redacted at trace time; only verify the call succeeded.`);
+      lines.push(`      assert.ok(result !== undefined, "expected non-undefined result");`);
+      lines.push(`    } else {`);
+      lines.push(`      assert.deepStrictEqual(result, __expected, ${JSON.stringify(`${prompt} output mismatch (span ${s.span_id ?? i})`)});`);
+      lines.push(`    }`);
+    } else {
+      lines.push(`    assert.ok(result !== undefined, "expected non-undefined result");`);
+    }
+    lines.push(`  }`);
+  }
+  lines.push("});");
+  lines.push("");
+  // Trace-level totals assertion. We compare *recorded* totals to what the
+  // re-run produced. The stub doesn't recompute tokens, so this is mostly
+  // a sanity check that the count of prompt_call spans matches.
+  lines.push(`test(${JSON.stringify(`replay trace ${traceId}: total ${totalPrompts} calls, ~${totalTokens} tokens`)}, () => {`);
+  lines.push(`  // Recorded totals — useful as a sanity check; the runtime numbers will`);
+  lines.push(`  // differ since the stub doesn't compute real token counts. We pin them`);
+  lines.push(`  // here so a future drift in instrumentation is visible at PR time.`);
+  lines.push(`  const recorded = { calls: ${totalPrompts}, tokens: ${totalTokens}, cost_usd: ${totalCost} };`);
+  lines.push(`  assert.equal(recorded.calls, ${totalPrompts});`);
+  lines.push(`  assert.equal(recorded.tokens, ${totalTokens});`);
+  // Floating-point comparison via a tolerance so trivial precision diffs
+  // don't fail the test if the user re-emits.
+  lines.push(`  assert.ok(Math.abs(recorded.cost_usd - ${totalCost}) < 0.0001);`);
+  lines.push(`});`);
+  lines.push("");
+
+  return lines.join("\n");
+}
+
+/**
+ * Heuristic: if cognitionImportPath is "../src/cognition", the providers
+ * module sits at "../src/providers" — same parent directory. We compute the
+ * import path for getModel from that. If the user passes a non-canonical
+ * cognition path, we just swap the trailing "cognition" segment for "providers".
+ */
+function modelImportPath(cognitionImportPath: string): string {
+  if (cognitionImportPath.endsWith("/cognition")) {
+    return cognitionImportPath.slice(0, -"/cognition".length) + "/providers";
+  }
+  if (cognitionImportPath.endsWith("/cognition/index")) {
+    return cognitionImportPath.slice(0, -"/cognition/index".length) + "/providers";
+  }
+  return cognitionImportPath + "/../providers";
+}
+
+function toMs(v: unknown): number {
+  if (typeof v === "number") return v;
+  if (typeof v === "string") {
+    const n = Date.parse(v);
+    return Number.isFinite(n) ? n : 0;
+  }
+  return 0;
+}

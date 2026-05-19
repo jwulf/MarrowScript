@@ -1,0 +1,691 @@
+{
+  "info": {
+    "name": "InventoryPlatform",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "auth": {
+    "type": "bearer",
+    "bearer": [
+      {
+        "key": "token",
+        "value": "{{token}}",
+        "type": "string"
+      }
+    ]
+  },
+  "variable": [
+    {
+      "key": "baseUrl",
+      "value": "http://localhost:3000"
+    },
+    {
+      "key": "token",
+      "value": ""
+    }
+  ],
+  "item": [
+    {
+      "name": "PlayerService",
+      "item": [
+        {
+          "name": "List Players",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/players",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "players"
+              ]
+            }
+          }
+        },
+        {
+          "name": "Create Player",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/players",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "players"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"id\": \"00000000-0000-0000-0000-000000000001\",\n  \"created_at\": \"2024-01-01T00:00:00.000Z\",\n  \"updated_at\": \"2024-01-01T00:00:00.000Z\",\n  \"username\": \"example\",\n  \"email\": \"example\",\n  \"score\": 1,\n  \"level\": 1,\n  \"inventory\": []\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "Get Player",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/players/:id",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "players",
+                ":id"
+              ]
+            }
+          }
+        },
+        {
+          "name": "Update Player",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/players/:id",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "players",
+                ":id"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"id\": \"00000000-0000-0000-0000-000000000001\",\n  \"created_at\": \"2024-01-01T00:00:00.000Z\",\n  \"updated_at\": \"2024-01-01T00:00:00.000Z\",\n  \"username\": \"example\",\n  \"email\": \"example\",\n  \"score\": 1,\n  \"level\": 1,\n  \"inventory\": []\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "Delete Player",
+          "request": {
+            "method": "DELETE",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/players/:id",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "players",
+                ":id"
+              ]
+            }
+          }
+        },
+        {
+          "name": "create_trade Player",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/players/create-trade",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "players",
+                "create-trade"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"id\": \"00000000-0000-0000-0000-000000000001\",\n  \"created_at\": \"2024-01-01T00:00:00.000Z\",\n  \"updated_at\": \"2024-01-01T00:00:00.000Z\",\n  \"username\": \"example\",\n  \"email\": \"example\",\n  \"score\": 1,\n  \"level\": 1,\n  \"inventory\": []\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "accept_trade Player",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/players/accept-trade",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "players",
+                "accept-trade"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"id\": \"00000000-0000-0000-0000-000000000001\",\n  \"created_at\": \"2024-01-01T00:00:00.000Z\",\n  \"updated_at\": \"2024-01-01T00:00:00.000Z\",\n  \"username\": \"example\",\n  \"email\": \"example\",\n  \"score\": 1,\n  \"level\": 1,\n  \"inventory\": []\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "award_xp Player",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/players/award-xp",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "players",
+                "award-xp"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"id\": \"00000000-0000-0000-0000-000000000001\",\n  \"created_at\": \"2024-01-01T00:00:00.000Z\",\n  \"updated_at\": \"2024-01-01T00:00:00.000Z\",\n  \"username\": \"example\",\n  \"email\": \"example\",\n  \"score\": 1,\n  \"level\": 1,\n  \"inventory\": []\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "consume_item Player",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/players/consume-item",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "players",
+                "consume-item"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"id\": \"00000000-0000-0000-0000-000000000001\",\n  \"created_at\": \"2024-01-01T00:00:00.000Z\",\n  \"updated_at\": \"2024-01-01T00:00:00.000Z\",\n  \"username\": \"example\",\n  \"email\": \"example\",\n  \"score\": 1,\n  \"level\": 1,\n  \"inventory\": []\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "ItemService",
+      "item": [
+        {
+          "name": "List Items",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/items",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "items"
+              ]
+            }
+          }
+        },
+        {
+          "name": "Create Item",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/items",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "items"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"id\": \"00000000-0000-0000-0000-000000000001\",\n  \"created_at\": \"2024-01-01T00:00:00.000Z\",\n  \"updated_at\": \"2024-01-01T00:00:00.000Z\",\n  \"name\": \"example\",\n  \"quantity\": 1,\n  \"rarity\": \"example\",\n  \"tradeable\": true,\n  \"owner_id\": \"00000000-0000-0000-0000-000000000001\",\n  \"metadata\": {}\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "Get Item",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/items/:id",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "items",
+                ":id"
+              ]
+            }
+          }
+        },
+        {
+          "name": "Update Item",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/items/:id",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "items",
+                ":id"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"id\": \"00000000-0000-0000-0000-000000000001\",\n  \"created_at\": \"2024-01-01T00:00:00.000Z\",\n  \"updated_at\": \"2024-01-01T00:00:00.000Z\",\n  \"name\": \"example\",\n  \"quantity\": 1,\n  \"rarity\": \"example\",\n  \"tradeable\": true,\n  \"owner_id\": \"00000000-0000-0000-0000-000000000001\",\n  \"metadata\": {}\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "Delete Item",
+          "request": {
+            "method": "DELETE",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/items/:id",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "items",
+                ":id"
+              ]
+            }
+          }
+        },
+        {
+          "name": "consume_item Item",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/items/consume-item",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "items",
+                "consume-item"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"id\": \"00000000-0000-0000-0000-000000000001\",\n  \"created_at\": \"2024-01-01T00:00:00.000Z\",\n  \"updated_at\": \"2024-01-01T00:00:00.000Z\",\n  \"name\": \"example\",\n  \"quantity\": 1,\n  \"rarity\": \"example\",\n  \"tradeable\": true,\n  \"owner_id\": \"00000000-0000-0000-0000-000000000001\",\n  \"metadata\": {}\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "TradeOfferService",
+      "item": [
+        {
+          "name": "List TradeOffers",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/trade_offers",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "trade_offers"
+              ]
+            }
+          }
+        },
+        {
+          "name": "Create TradeOffer",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/trade_offers",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "trade_offers"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"id\": \"00000000-0000-0000-0000-000000000001\",\n  \"created_at\": \"2024-01-01T00:00:00.000Z\",\n  \"updated_at\": \"2024-01-01T00:00:00.000Z\",\n  \"from_player\": \"00000000-0000-0000-0000-000000000001\",\n  \"to_player\": \"00000000-0000-0000-0000-000000000001\",\n  \"offered_items\": [],\n  \"requested_items\": [],\n  \"status\": \"example\",\n  \"expires_at\": \"2024-01-01T00:00:00.000Z\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "Get TradeOffer",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/trade_offers/:id",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "trade_offers",
+                ":id"
+              ]
+            }
+          }
+        },
+        {
+          "name": "Update TradeOffer",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/trade_offers/:id",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "trade_offers",
+                ":id"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"id\": \"00000000-0000-0000-0000-000000000001\",\n  \"created_at\": \"2024-01-01T00:00:00.000Z\",\n  \"updated_at\": \"2024-01-01T00:00:00.000Z\",\n  \"from_player\": \"00000000-0000-0000-0000-000000000001\",\n  \"to_player\": \"00000000-0000-0000-0000-000000000001\",\n  \"offered_items\": [],\n  \"requested_items\": [],\n  \"status\": \"example\",\n  \"expires_at\": \"2024-01-01T00:00:00.000Z\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "Delete TradeOffer",
+          "request": {
+            "method": "DELETE",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/trade_offers/:id",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "trade_offers",
+                ":id"
+              ]
+            }
+          }
+        },
+        {
+          "name": "accept_trade TradeOffer",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/trade_offers/accept-trade",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "trade_offers",
+                "accept-trade"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"id\": \"00000000-0000-0000-0000-000000000001\",\n  \"created_at\": \"2024-01-01T00:00:00.000Z\",\n  \"updated_at\": \"2024-01-01T00:00:00.000Z\",\n  \"from_player\": \"00000000-0000-0000-0000-000000000001\",\n  \"to_player\": \"00000000-0000-0000-0000-000000000001\",\n  \"offered_items\": [],\n  \"requested_items\": [],\n  \"status\": \"example\",\n  \"expires_at\": \"2024-01-01T00:00:00.000Z\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        }
+      ]
+    }
+  ]
+}

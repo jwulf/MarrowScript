@@ -1,0 +1,10 @@
+{
+  "name": "artifact-check",
+  "private": true,
+  "version": "0.0.0",
+  "scripts": { "check": "tsc --noEmit" },
+  "devDependencies": {
+    "@types/node": "20.11.30",
+    "typescript": "5.5.3"
+  }
+}

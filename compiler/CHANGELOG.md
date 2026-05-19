@@ -1,6 +1,6 @@
 # Changelog
 
-All notable changes to `bonescript-compiler` are documented here. The format
+All notable changes to `marrowscript-compiler` are documented here. The format
 follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and this project
 adheres to [Semantic Versioning](https://semver.org/).
 
@@ -54,7 +54,7 @@ adheres to [Semantic Versioning](https://semver.org/).
   `migrate` script + better-sqlite3 / dotenv / uuid dependencies, and the
   README is updated to describe what's actually produced. A future release
   will add full route generation that emits SQLite-compatible SQL.
-- **`bonec validate` auto-detects** the output directory if no path is
+- **`marrowc validate` auto-detects** the output directory if no path is
   passed. Looks for `output/`, `output-sqlite/`, `output-nakama/` (in that
   order) and uses the first one with a `tsconfig.json`.
 - **CLI rejects `--no-sdk` / `--no-openapi` / `--no-seed` for non-Express
@@ -73,13 +73,13 @@ adheres to [Semantic Versioning](https://semver.org/).
 
 ### Notes for downstream consumers
 - The `belongs_to` fix changes the IR shape in a backward-compatible way.
-  Existing `.bone` files that manually duplicate the FK column in `owns:`
+  Existing `.marrow` files that manually duplicate the FK column in `owns:`
   continue to work — the synthesizer skips columns that are already
   declared.
 - The Prisma fix means `int @db.BigInt` is no longer emitted. If you were
   relying on the (broken) BigInt mapping, bump your tolerated integer size
   in your application code, or wait for a future release that adds an
-  explicit `@db.bigint` annotation in BoneScript syntax.
+  explicit `@db.bigint` annotation in MarrowScript syntax.
 - The SQLite target is now explicitly schema-only. If you were generating
   with `--target sqlite` and trying to run the result, switch to the
   default Express target until full SQLite route generation lands.
@@ -93,7 +93,7 @@ adheres to [Semantic Versioning](https://semver.org/).
   audit log, and event outbox. Ideal for local development, demos, and small
   single-node deployments. Run:
   ```bash
-  bonec compile app.bone --target sqlite
+  marrowc compile app.marrow --target sqlite
   cd output-sqlite && npm install && npm run migrate && npm run dev
   ```
   The DB client wraps `better-sqlite3` and translates Postgres-style `$N`
@@ -101,7 +101,7 @@ adheres to [Semantic Versioning](https://semver.org/).
   route handlers work across both targets.
 - **Webhook notification provider** (`NOTIFY_PROVIDER=webhook`). Posts event
   payloads as `application/json` to `NOTIFY_WEBHOOK_URL`. Sets
-  `X-BoneScript-Event` and an `X-BoneScript-Signature` header (HMAC-SHA256
+  `X-MarrowScript-Event` and an `X-MarrowScript-Signature` header (HMAC-SHA256
   of the body when `NOTIFY_WEBHOOK_SECRET` is set). Receivers can verify
   authenticity with the same secret. Rejects non-`http(s)` URLs.
 - **React hooks SDK** (`sdk/react.ts`). Generated alongside `sdk/client.ts`
@@ -133,13 +133,13 @@ adheres to [Semantic Versioning](https://semver.org/).
 ## [0.7.0] - 2026-05-16
 
 ### Added
-- **Prisma schema emitter** (`--target prisma`). Compiles `.bone` files to a
+- **Prisma schema emitter** (`--target prisma`). Compiles `.marrow` files to a
   complete `prisma/schema.prisma` with proper type mappings, `@id`, `@default`,
   `@unique`, `@updatedAt`, native type annotations (`@db.Uuid`,
   `@db.Timestamptz`, etc.), relation directives, junction table models for
   many-to-many, and infrastructure models (`AuditLog`, `EventOutbox`).
-  Usage: `bonec compile app.bone --target prisma`
-- **`bonec validate [dir]` command.** Runs `tsc --noEmit` against a generated
+  Usage: `marrowc compile app.marrow --target prisma`
+- **`marrowc validate [dir]` command.** Runs `tsc --noEmit` against a generated
   output directory to verify the generated TypeScript compiles cleanly. Useful
   for CI pipelines. Exits with code 1 on type errors.
 - `PrismaEmitter` exported from the public API for programmatic use.
@@ -148,7 +148,7 @@ adheres to [Semantic Versioning](https://semver.org/).
 - The `prisma` target is additive — it does not affect the default `express`
   target output. Use `--target prisma` to get a standalone Prisma schema
   alongside (or instead of) the full Express project.
-- `bonec validate` requires `npm install` to have been run in the output
+- `marrowc validate` requires `npm install` to have been run in the output
   directory first (it needs `node_modules/` for type resolution).
 
 ## [0.6.2] - 2026-05-16
@@ -161,8 +161,8 @@ adheres to [Semantic Versioning](https://semver.org/).
   - On a fresh clone, contributors get the build by running `npm install` in
     any consuming package or by running `npm run build` in `compiler/`.
 - Fixed the `repository`, `homepage`, and `bugs` URLs in `compiler/package.json`
-  — they pointed at a stale `dantheman181/bonescript` GitHub URL. Now point at
-  the actual repo, `Doorman11991/BoneScript`. The npm package metadata for
+  — they pointed at a stale `dantheman181/marrowscript` GitHub URL. Now point at
+  the actual repo, `Doorman11991/MarrowScript`. The npm package metadata for
   v0.6.2 reflects this; users on v0.6.1 will see the wrong URLs in `npm view`
   output but the package contents are otherwise identical.
 - Rewrote `.gitignore` to use ASCII section separators instead of mojibaked
@@ -270,13 +270,13 @@ example type-checks cleanly, and `npm audit` reports zero vulnerabilities.
 
 ### Notes for downstream consumers
 - This release is the first to depend on `zod` in generated projects. Consumers
-  who run `bonec compile` will see `zod` show up in their generated
+  who run `marrowc compile` will see `zod` show up in their generated
   `package.json`.
 - The `@renamed_from` and `@sensitive` annotations require parser support
-  introduced in this release. `.bone` files using them will fail to parse on
+  introduced in this release. `.marrow` files using them will fail to parse on
   v0.5.x.
 - The `caller` identifier in capability `requires:` clauses is a new built-in.
-  If a `.bone` file already declared a parameter named `caller`, recompile
+  If a `.marrow` file already declared a parameter named `caller`, recompile
   carefully — the built-in shadows the parameter.
 
 ## [0.5.8] and earlier
@@ -284,6 +284,6 @@ example type-checks cleanly, and `npm audit` reports zero vulnerabilities.
 See git history. Versions 0.5.4 → 0.5.8 were published in the v0.5 line and
 are superseded by 0.6.0.
 
-[0.6.2]: https://www.npmjs.com/package/bonescript-compiler/v/0.6.2
-[0.6.1]: https://www.npmjs.com/package/bonescript-compiler/v/0.6.1
-[0.6.0]: https://www.npmjs.com/package/bonescript-compiler/v/0.6.0
+[0.6.2]: https://www.npmjs.com/package/marrowscript-compiler/v/0.6.2
+[0.6.1]: https://www.npmjs.com/package/marrowscript-compiler/v/0.6.1
+[0.6.0]: https://www.npmjs.com/package/marrowscript-compiler/v/0.6.0

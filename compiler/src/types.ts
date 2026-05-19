@@ -1,5 +1,5 @@
 /**
- * BoneScript Type System â€” Internal type representations.
+ * MarrowScript Type System â€” Internal type representations.
  * Implements spec/04_TYPE_SYSTEM.md.
  */
 

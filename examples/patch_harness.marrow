@@ -1,0 +1,309 @@
+// MarrowScript LLM Harness — code-patch generation example
+//
+// Input:  a Task describing a desired change, plus a repository index
+// Output: a validated Patch (string of code) the user can apply
+//
+// What this demonstrates (the full harness picture):
+//   - Three models with a confidence-aware tier ladder
+//   - A `semantic_slice` cognition primitive for bounded retrieval
+//     (no whole-repo dumps; walks the symbol/dependency graph to depth 2)
+//   - A `compress_context` primitive that summarises older messages so
+//     the prompt stays inside the model's context window
+//   - A code-generation prompt with `validate: ast_compiles` so the
+//     compiler-emitted Express runtime runs `tsc --noEmit` over the model's
+//     output before accepting it
+//   - `on_invalid: retry_with_repair_prompt` — invalid output triggers a
+//     bounded single-shot repair via a smaller scope and (optionally) a
+//     smaller model
+//   - A flow with explicit compensations so apply / rollback is explicit
+//   - Audit + tracing + budget guards inherited from the rest of the system
+//
+// Compile with: marrowc compile patch_harness.marrow
+// Generated tree includes the cognition runtime PLUS the memory layer:
+//   - src/memory/{semantic_index,retriever,compressor,index}.ts
+//   - migrations/semantic_index.sql
+//   - bin/index_sources.ts (offline indexer)
+//   - src/cognition/* (router, prompts, primitives, validate, repair, traces)
+
+system PatchHarness {
+  domain: cognitive_scaffold
+
+  // ─── Entities ────────────────────────────────────────────────────────────
+
+  // The Task entity is what the API takes as input.
+  entity Task {
+    owns: [
+      description: string,
+      target_file: string,
+      complexity: float
+    ]
+    constraints: [
+      complexity >= 0.0,
+      complexity <= 1.0
+    ]
+    states: pending -> classified -> sliced -> generated -> applied | failed
+  }
+
+  // A semantic slice — output of the retrieval primitive, input to generation.
+  entity SemanticSlice {
+    owns: [
+      task_id: uuid,
+      target_symbol: string,
+      files: string,
+      symbols: string
+    ]
+  }
+
+  // A patch is the model's output before validation succeeds.
+  entity Patch {
+    owns: [
+      task_id: uuid,
+      diff: string,
+      summary: string,
+      symbol: string,
+      ast_compiles: bool
+    ]
+  }
+
+  // ─── Stores ──────────────────────────────────────────────────────────────
+
+  store TaskStore {
+    engine: postgresql
+    schema: {
+      id: uuid,
+      description: string,
+      target_file: string,
+      complexity: float,
+      created_at: timestamp,
+      updated_at: timestamp
+    }
+  }
+
+  store PatchStore {
+    engine: postgresql
+    schema: {
+      id: uuid,
+      task_id: uuid,
+      diff: string,
+      summary: string,
+      symbol: string,
+      ast_compiles: bool,
+      created_at: timestamp
+    }
+  }
+
+  // ─── Events ──────────────────────────────────────────────────────────────
+
+  event PatchGenerated {
+    payload: {
+      task_id: uuid,
+      patch_id: uuid,
+      symbol: string,
+      ast_compiles: bool
+    }
+    delivery: at_least_once
+    ttl: 7d
+  }
+
+  event PatchRepaired {
+    payload: {
+      task_id: uuid,
+      patch_id: uuid,
+      reason: string
+    }
+    delivery: at_least_once
+    ttl: 7d
+  }
+
+  // ─── Extension points (prompt bodies + custom validators) ────────────────
+
+  extension_point tmpl_classify_task(description: string) {
+    returns: string
+    stable: true
+  }
+
+  extension_point tmpl_summarize_history(history: string, max_tokens: uint) {
+    returns: string
+    stable: true
+  }
+
+  extension_point tmpl_generate_patch(symbol: string, files: string, description: string) {
+    returns: string
+    stable: true
+  }
+
+  extension_point tmpl_repair_patch(symbol: string, error: string, original: string) {
+    returns: string
+    stable: true
+  }
+
+  // ─── Models ──────────────────────────────────────────────────────────────
+
+  model TinyClassifier {
+    provider: ollama
+    name: "qwen2.5-coder:1.5b"
+    context_window: 32000
+    max_output: 256
+    temperature: 0.0
+    cost_class: tiny
+    latency_class: fast
+  }
+
+  model SmallSummarizer {
+    provider: openai_compat
+    endpoint: "http://127.0.0.1:8080/v1"
+    name: "phi-3.5-mini"
+    context_window: 128000
+    max_output: 1024
+    temperature: 0.0
+    cost_class: small
+    latency_class: medium
+  }
+
+  model MediumGenerator {
+    provider: ollama
+    name: "qwen2.5-coder:7b"
+    context_window: 32000
+    max_output: 4096
+    temperature: 0.0
+    cost_class: medium
+    latency_class: medium
+  }
+
+  // ─── Router ──────────────────────────────────────────────────────────────
+
+  // Generate uses MediumGenerator by default. If confidence dips below 0.7
+  // on the medium model, escalate would push to a still-larger fallback.
+  // For this example we stay on a 2-tier ladder — Small handles short tasks,
+  // Medium handles the rest.
+  router cheapest_valid {
+    by: input.complexity
+    tier easy   { max: 0.3 -> SmallSummarizer }
+    tier hard   {           -> MediumGenerator }
+    on_low_confidence: escalate
+    confidence_threshold: 0.7
+    fallback: MediumGenerator
+  }
+
+  // ─── Prompts ─────────────────────────────────────────────────────────────
+
+  // 1) Classify the task into a closed set of kinds. Used for routing and
+  //    metrics; not for tool invocation.
+  prompt classify_task(description: string) {
+    model: TinyClassifier
+    template: "extension_point:tmpl_classify_task"
+    returns: string
+    timeout: 5s
+    idempotent: true
+    validate: schema_only
+    on_invalid: retry
+    retry: { max_attempts: 2, backoff: fixed, interval: 200ms }
+    cache: { key: hash(description), ttl: 1h }
+  }
+
+  // 2) Summariser — used by the `compress_context` cognition primitive when
+  //    older history needs to fit in a smaller window.
+  prompt summarize_history(history: string, max_tokens: uint) {
+    model: SmallSummarizer
+    template: "extension_point:tmpl_summarize_history"
+    returns: string
+    timeout: 30s
+    idempotent: true
+    validate: schema_only
+    on_invalid: retry
+    retry: { max_attempts: 2, backoff: fixed, interval: 500ms }
+    cache: { key: hash(history), ttl: 1h }
+    constraints: [
+      output.length <= max_tokens
+    ]
+  }
+
+  // 3) Patch generator — routes through the tier ladder. Validation runs
+  //    `tsc --noEmit` over the output so syntactically broken patches never
+  //    reach apply. Repair re-prompts a bounded single-shot.
+  prompt generate_patch(symbol: string, files: string, description: string, complexity: float) {
+    router: cheapest_valid
+    template: "extension_point:tmpl_generate_patch"
+    returns: string
+    timeout: 60s
+    validate: ast_compiles
+    on_invalid: retry_with_repair_prompt
+    retry: { max_attempts: 3, backoff: exponential, interval: 1s }
+  }
+
+  // ─── Capabilities ────────────────────────────────────────────────────────
+
+  // Bounded retrieval. Walks the symbol/dependency graph to hop_depth=2,
+  // capped at 8 files. The semantic index is built offline by bin/index_sources.ts
+  // and is read-only at request time.
+  capability slice_for_task(t: Task) {
+    cognition: semantic_slice using {
+      task: t.description,
+      max_files: 8,
+      hop_depth: 2
+    }
+    returns: SemanticSlice
+    sync: eventual
+    idempotent: true
+  }
+
+  // Context compression. When a task carries a long history, summarise the
+  // older half via the SmallSummarizer prompt before passing to the generator.
+  capability compress_history(t: Task, target_tokens: uint) {
+    cognition: compress_context using {
+      history: t.description,
+      target_tokens: target_tokens,
+      strategy: "summarize_oldest"
+    }
+    returns: string
+    sync: eventual
+    idempotent: true
+  }
+
+  // Persisting the patch. Audit + outbox happen automatically via `policy harness`.
+  capability save_patch(p: Patch) {
+    effects: [
+      p.ast_compiles = true
+    ]
+    emits: PatchGenerated
+    sync: transactional
+  }
+
+  capability rollback_patch(p: Patch) {
+    effects: [
+      p.ast_compiles = false
+    ]
+    sync: transactional
+  }
+
+  // The full pipeline: classify → slice → compress → generate → save.
+  // Every step is bounded; on_error: rollback walks the compensations.
+  capability run_patch(t: Task) {
+    pipeline: {
+      classify_task(t.description) as kind
+      slice_for_task(t) as slice
+      compress_history(t, 4000) as ctx
+      generate_patch(slice.target_symbol, slice.files, t.description, t.complexity) as diff
+      on_error: rollback
+    }
+    sync: transactional
+    timeout: 5m
+  }
+
+  // ─── Flow with explicit compensations ────────────────────────────────────
+
+  flow patch_with_recovery {
+    step generate: run_patch(t)
+      compensate: rollback_patch(p)
+    step apply: save_patch(p)
+      compensate: rollback_patch(p)
+  }
+
+  // ─── Policy (audit + rate-limit + encryption) ────────────────────────────
+
+  policy harness {
+    rate_limit: 30 per 1m
+    audit: true
+    encryption: in_transit
+  }
+}

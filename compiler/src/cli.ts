@@ -1,5 +1,5 @@
 /**
- * BoneScript compiler CLI
+ * MarrowScript compiler CLI
  */
 
 import * as fs from "fs";
@@ -21,6 +21,11 @@ import { Formatter } from "./formatter";
 import { scaffold, ScaffoldDomain } from "./scaffold";
 import { mergeWithExisting } from "./extension_manager";
 import { optimize } from "./optimizer";
+import { traceToTest } from "./trace_to_test";
+import { reflectProject, emitMarrowStub, diffEntities, formatDiff, type ReflectedEntity } from "./reflect";
+import { tuneRouter, formatTuneReport } from "./tune_router";
+import { applyTuneRewrites } from "./tune_rewrite";
+import { reflectProjectWithLLM, emitEnrichedStub, OpenAICompatProvider as ReflectLLMProvider } from "./reflect_llm";
 
 function main() {
   const args = process.argv.slice(2);
@@ -72,6 +77,24 @@ function main() {
     case "validate":
       runValidate(args.slice(1));
       break;
+    case "replay":
+      runReplay(args.slice(1));
+      break;
+    case "trace-to-test":
+      runTraceToTest(args.slice(1));
+      break;
+    case "reflect":
+      runReflect(args.slice(1));
+      break;
+    case "diff-spec":
+      runDiffSpec(args.slice(1));
+      break;
+    case "tune-router":
+      runTuneRouter(args.slice(1));
+      break;
+    case "reflect-llm":
+      runReflectLLM(args.slice(1));
+      break;
     default:
       console.error(`Unknown command: ${command}`);
       showHelp();
@@ -80,19 +103,31 @@ function main() {
 }
 
 function showHelp() {
-  console.log("BoneScript compiler v0.8.1");
+  console.log("MarrowScript compiler v0.8.1");
   console.log("");
   console.log("Usage:");
-  console.log("  bonec compile <file> [--target <target>]  Compile to runnable project");
-  console.log("  bonec check <file>     Lex + parse + type check (no codegen)");
-  console.log("  bonec validate [dir]   Type-check generated output (runs tsc --noEmit)");
-  console.log("  bonec lex <file>       Show token stream");
-  console.log("  bonec parse <file>     Show AST");
-  console.log("  bonec ir <file>        Show IR (JSON)");
-  console.log("  bonec fmt <file>       Format file in place");
-  console.log("  bonec watch <file>     Recompile on change");
-  console.log("  bonec diff <old.bone> <new.bone> [--write <output_dir>]");
+  console.log("  marrowc compile <file> [--target <target>]  Compile to runnable project");
+  console.log("  marrowc check <file>     Lex + parse + type check (no codegen)");
+  console.log("  marrowc validate [dir]   Type-check generated output (runs tsc --noEmit)");
+  console.log("  marrowc lex <file>       Show token stream");
+  console.log("  marrowc parse <file>     Show AST");
+  console.log("  marrowc ir <file>        Show IR (JSON)");
+  console.log("  marrowc fmt <file>       Format file in place");
+  console.log("  marrowc watch <file>     Recompile on change");
+  console.log("  marrowc diff <old.marrow> <new.marrow> [--write <output_dir>]");
   console.log("                          Show schema migration diff (or write to migrations/_manual)");
+  console.log("  marrowc replay <trace_id> [--out <dir>]");
+  console.log("                          Print + dump a cognition trace from cognition_traces");
+  console.log("  marrowc trace-to-test <trace.json> [--out <file>] [--no-assert-outputs]");
+  console.log("                          Convert a recorded trace into a node:test regression test");
+  console.log("  marrowc reflect <project_dir> [--out <file>] [--system <name>]");
+  console.log("                          Infer a stub .marrow from existing TypeScript source (Phase 20)");
+  console.log("  marrowc diff-spec <spec.marrow> <project_dir>");
+  console.log("                          Show drift between a .marrow spec and a TypeScript project");
+  console.log("  marrowc tune-router <name> --spec <file.marrow> --traces <dir>");
+  console.log("                          Aggregate recorded traces and report against router policy (Phase 19 v2)");
+  console.log("  marrowc reflect-llm <project_dir> [--out <file>] [--system <name>] [--endpoint <url>] [--model <name>]");
+  console.log("                          Phase 20 v2: LLM-driven inference of capabilities + entities");
   console.log("");
   console.log("compile options:");
   console.log("  --target <name>        Output target (default: express)");
@@ -107,10 +142,11 @@ function showHelp() {
   console.log("  --no-seed              Skip seed file generation (express target only)");
   console.log("");
   console.log("init options:");
-  console.log("  bonec init <name> --domain <name>  Scaffold from a domain template");
+  console.log("  marrowc init <name> --domain <name>  Scaffold from a domain template");
   console.log("  --domain <name>        Domain template (default: saas_platform)");
   console.log("                         Options: multiplayer_game, saas_platform, iot_system,");
-  console.log("                                  social_network, marketplace, realtime_collaboration");
+  console.log("                                  social_network, marketplace, realtime_collaboration,");
+  console.log("                                  cognitive_scaffold (LLM harness)");
   console.log("  --out <dir>            Output directory (default: current dir)");
 }
 
@@ -271,6 +307,7 @@ function runInit(args: string[]) {
   const validDomains: ScaffoldDomain[] = [
     "multiplayer_game", "saas_platform", "iot_system",
     "social_network", "marketplace", "realtime_collaboration",
+    "cognitive_scaffold",
   ];
   if (!validDomains.includes(domain)) {
     console.error(`Error: Invalid domain '${domain}'. Valid: ${validDomains.join(", ")}`);
@@ -282,7 +319,7 @@ function runInit(args: string[]) {
   for (const f of result.created) console.log(`  ${f}`);
   console.log(`\nNext steps:`);
   console.log(`  cd ${outDir}`);
-  console.log(`  bone compile ${name}.bone`);
+  console.log(`  bone compile ${name}.marrow`);
 }
 
 // â”€â”€â”€ Compile (full pipeline) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
@@ -546,7 +583,7 @@ function runCompileNakama(source: string, resolved: string) {
 
 function runDiff(args: string[]) {
   if (args.length < 2) {
-    console.error("Usage: bone diff <old.bone> <new.bone> [--write <dir>]");
+    console.error("Usage: bone diff <old.marrow> <new.marrow> [--write <dir>]");
     process.exit(1);
   }
 
@@ -652,7 +689,7 @@ function runDiff(args: string[]) {
   }
 
   const header = [
-    `-- BoneScript schema diff: ${path.basename(oldFile)} → ${path.basename(newFile)}`,
+    `-- MarrowScript schema diff: ${path.basename(oldFile)} → ${path.basename(newFile)}`,
     `-- Generated: ${new Date().toISOString()}`,
     ``,
   ];
@@ -692,7 +729,7 @@ function runDebug(source: string, resolved: string) {
     const { emitSourceMapFile } = require("./emit_sourcemap");
     for (const sys of irSystems) {
       const mapContent = emitSourceMapFile(sys, path.basename(resolved));
-      const mapPath = path.join(path.dirname(resolved), `${sys.name}.bone.map`);
+      const mapPath = path.join(path.dirname(resolved), `${sys.name}.marrow.map`);
       fs.writeFileSync(mapPath, mapContent, "utf-8");
       console.log(`v Source map written: ${mapPath}`);
       console.log(`  ${sys.modules.length} modules mapped`);
@@ -716,7 +753,7 @@ function runTest(args: string[]) {
     process.exit(1);
   }
 
-  console.log(`Running BoneScript regression tests...`);
+  console.log(`Running MarrowScript regression tests...`);
   console.log(`Test file: ${testFile}`);
   console.log(`Target: ${process.env.TEST_BASE_URL || "http://localhost:3000"}`);
   console.log(``);
@@ -867,7 +904,7 @@ function runValidate(args: string[]) {
     if (!found) {
       console.error("Error: No generated output directory found.");
       console.error("Looked for: " + candidates.join(", ") + " in " + process.cwd());
-      console.error("Pass an explicit path: bonec validate <dir>");
+      console.error("Pass an explicit path: marrowc validate <dir>");
       process.exit(1);
     }
     outputDir = found;
@@ -876,14 +913,14 @@ function runValidate(args: string[]) {
 
   if (!fs.existsSync(outputDir)) {
     console.error(`Error: Output directory not found: ${outputDir}`);
-    console.error("Run 'bonec compile <file>' first to generate output.");
+    console.error("Run 'marrowc compile <file>' first to generate output.");
     process.exit(1);
   }
 
   const tsconfigPath = path.join(outputDir, "tsconfig.json");
   if (!fs.existsSync(tsconfigPath)) {
     console.error(`Error: No tsconfig.json found in ${outputDir}`);
-    console.error("The output directory doesn't appear to be a BoneScript-generated project.");
+    console.error("The output directory doesn't appear to be a MarrowScript-generated project.");
     process.exit(1);
   }
 
@@ -933,13 +970,474 @@ function runValidate(args: string[]) {
   }
 }
 
+// ─── Replay (Phase 6: cognition_traces) ───────────────────────────────────────
+//
+// Reads spans for a given trace_id from the cognition_traces table (or the
+// in-memory backend during dev) and prints a human-readable summary. Also
+// writes traces/<trace_id>.json next to the output directory so users can
+// build replay drivers that swap in a fixture provider returning the recorded
+// outputs.
+//
+// Usage:
+//   marrowc replay <trace_id> [--out <output_dir>]
+//
+// The output directory is auto-detected from ./output if --out is omitted.
+// Postgres mode uses the project's existing src/db pool; memory mode reads
+// from the in-process span buffer (mostly useful when invoked from inside
+// the harness application itself rather than via the CLI).
+
+function runReplay(args: string[]) {
+  if (args.length === 0) {
+    console.error("Usage: marrowc replay <trace_id> [--out <output_dir>]");
+    process.exit(1);
+  }
+  const traceId = args[0];
+  let outputDir = path.resolve("output");
+  for (let i = 1; i < args.length; i++) {
+    if (args[i] === "--out" && args[i + 1]) {
+      outputDir = path.resolve(args[i + 1]);
+      i++;
+    }
+  }
+  const tracesModule = path.join(outputDir, "src", "cognition", "traces.ts");
+  if (!fs.existsSync(tracesModule)) {
+    console.error(`No cognition traces module at ${tracesModule}`);
+    console.error(`Run 'marrowc compile <file>' first and ensure the system declares prompts.`);
+    process.exit(1);
+  }
+  // Spawn ts-node inside the output directory so the lazy require("../db") from
+  // src/cognition/traces.ts resolves correctly when LLM_TRACES_BACKEND=pg.
+  const driverSrc = `
+import { loadTrace } from "./src/cognition/traces";
+import * as fs from "fs";
+import * as path from "path";
+
+(async () => {
+  const trace_id = ${JSON.stringify(traceId)};
+  const spans = await loadTrace(trace_id);
+  if (spans.length === 0) {
+    console.error("No spans found for trace", trace_id);
+    console.error("Hint: in-memory backend only retains spans within the same process.");
+    process.exit(2);
+  }
+  // Human summary.
+  console.log("Trace " + trace_id + " — " + spans.length + " span(s)");
+  console.log("=".repeat(72));
+  let totalTokens = 0;
+  let totalCost = 0;
+  let cacheHits = 0;
+  for (const s of spans) {
+    const tokens = (s.prompt_tokens ?? 0) + (s.completion_tokens ?? 0);
+    totalTokens += tokens;
+    totalCost += s.cost_usd ?? 0;
+    if (s.cache_hit) cacheHits++;
+    const line = [
+      new Date(s.started_at).toISOString(),
+      "[" + s.kind + "]",
+      s.workflow + "." + s.step,
+      "→ " + s.status,
+      s.model ? "(" + s.model + ")" : "",
+      tokens > 0 ? tokens + "tok" : "",
+      s.latency_ms + "ms",
+      s.cache_hit ? "[cache]" : "",
+    ].filter(Boolean).join(" ");
+    console.log("  " + line);
+    if (s.error_code) console.log("    error: " + s.error_code);
+    if (s.metadata && Object.keys(s.metadata).length > 0) {
+      console.log("    metadata: " + JSON.stringify(s.metadata).slice(0, 200));
+    }
+  }
+  console.log("=".repeat(72));
+  console.log("Total tokens: " + totalTokens + ", cost: $" + totalCost.toFixed(6) + ", cache hits: " + cacheHits);
+
+  // Write a JSON fixture next to the output dir so users can build replay drivers.
+  const dir = path.resolve("traces");
+  fs.mkdirSync(dir, { recursive: true });
+  const out = path.join(dir, trace_id + ".json");
+  fs.writeFileSync(out, JSON.stringify(spans, null, 2), "utf-8");
+  console.log("Wrote fixture to " + path.relative(process.cwd(), out));
+})().catch(err => {
+  console.error("Replay failed:", err && err.message ? err.message : err);
+  process.exit(1);
+});
+`;
+  const driverPath = path.join(outputDir, ".bonec_replay.ts");
+  fs.writeFileSync(driverPath, driverSrc, "utf-8");
+  try {
+    require("child_process").execSync(`npx --no-install ts-node --transpile-only ${driverPath}`, {
+      cwd: outputDir,
+      stdio: "inherit",
+      env: { ...process.env },
+    });
+  } catch {
+    process.exit(1);
+  } finally {
+    try { fs.unlinkSync(driverPath); } catch { /* best effort */ }
+  }
+}
+
+// ─── Trace → regression test (Phase 22) ──────────────────────────────────────
+//
+// Reads a JSON trace dumped by `marrowc replay <trace_id>` and emits a
+// node:test regression test that pins every recorded prompt input → output
+// mapping. Catches "the surrounding code changed but the LLM behavior
+// stayed the same" regressions cheaply.
+//
+// Usage:
+//   marrowc trace-to-test <trace.json> [--out <file>] [--no-assert-outputs]
+//
+// When --out is omitted, the test is written next to the trace as
+// <trace>.test.ts. When --no-assert-outputs is set, only the call sequence
+// is verified — useful when outputs are non-deterministic and you only
+// care about the prompt count / call shape.
+
+function runTraceToTest(args: string[]) {
+  if (args.length === 0) {
+    console.error("Usage: marrowc trace-to-test <trace.json> [--out <file>] [--no-assert-outputs]");
+    process.exit(1);
+  }
+  const tracePath = path.resolve(args[0]);
+  if (!fs.existsSync(tracePath)) {
+    console.error(`Trace file not found: ${tracePath}`);
+    process.exit(1);
+  }
+  let outPath = tracePath.replace(/\.json$/i, "") + ".test.ts";
+  let assertOutputs = true;
+  for (let i = 1; i < args.length; i++) {
+    if (args[i] === "--out" && args[i + 1]) { outPath = path.resolve(args[i + 1]); i++; }
+    else if (args[i] === "--no-assert-outputs") { assertOutputs = false; }
+  }
+  let raw: string;
+  try { raw = fs.readFileSync(tracePath, "utf-8"); }
+  catch (e) { console.error(`Failed to read trace: ${(e as Error).message}`); process.exit(1); }
+  let spans: unknown;
+  try { spans = JSON.parse(raw); }
+  catch (e) { console.error(`Trace is not valid JSON: ${(e as Error).message}`); process.exit(1); }
+  if (!Array.isArray(spans)) {
+    console.error(`Trace must be a JSON array of spans (got ${typeof spans})`);
+    process.exit(1);
+  }
+  // Trace id: prefer the explicit field on the first span; fall back to the file name.
+  const first = (spans[0] ?? {}) as { trace_id?: string };
+  const traceId = first.trace_id || path.basename(tracePath).replace(/\.json$/i, "");
+  const test = traceToTest(spans as Parameters<typeof traceToTest>[0], { traceId, assertOutputs });
+  try {
+    fs.mkdirSync(path.dirname(outPath), { recursive: true });
+    fs.writeFileSync(outPath, test, "utf-8");
+  } catch (e) {
+    console.error(`Failed to write test: ${(e as Error).message}`);
+    process.exit(1);
+  }
+  const promptCallCount = (spans as { kind?: string }[]).filter(s => s.kind === "prompt_call").length;
+  console.log(`v Wrote regression test: ${path.relative(process.cwd(), outPath)}`);
+  console.log(`  Trace id: ${traceId}`);
+  console.log(`  Prompt calls replayed: ${promptCallCount}`);
+  console.log(`  Run with: npx --no-install ts-node --transpile-only --test ${path.relative(process.cwd(), outPath)}`);
+}
+
+// ─── Reflect: TypeScript → .marrow stub (Phase 20) ────────────────────────────
+//
+// Walks a project directory, finds entity-shaped class/interface declarations
+// (those with an `id` member), and emits a stub .marrow source. Intended as
+// an adoption helper for existing TypeScript codebases — review the output
+// before merging.
+//
+// v1 is AST-only — capabilities, state machines, and audit boundaries need
+// LLM-driven inference (future work).
+
+function runReflect(args: string[]) {
+  if (args.length === 0) {
+    console.error("Usage: marrowc reflect <project_dir> [--out <file>] [--system <name>]");
+    process.exit(1);
+  }
+  const root = path.resolve(args[0]);
+  if (!fs.existsSync(root) || !fs.statSync(root).isDirectory()) {
+    console.error(`Not a directory: ${root}`);
+    process.exit(1);
+  }
+  let outPath: string | null = null;
+  let systemName = path.basename(root);
+  for (let i = 1; i < args.length; i++) {
+    if (args[i] === "--out" && args[i + 1]) { outPath = path.resolve(args[i + 1]); i++; }
+    else if (args[i] === "--system" && args[i + 1]) { systemName = args[i + 1]; i++; }
+  }
+  // Sanitise the system name to a valid identifier.
+  systemName = systemName.replace(/[^A-Za-z0-9_]/g, "_");
+  if (/^[0-9]/.test(systemName)) systemName = "S_" + systemName;
+
+  let result;
+  try { result = reflectProject(root); }
+  catch (e) { console.error(`Reflect failed: ${(e as Error).message}`); process.exit(1); return; }
+
+  const stub = emitMarrowStub(systemName, result);
+  if (outPath) {
+    try {
+      fs.mkdirSync(path.dirname(outPath), { recursive: true });
+      fs.writeFileSync(outPath, stub, "utf-8");
+      console.log(`v Wrote stub: ${path.relative(process.cwd(), outPath)}`);
+    } catch (e) {
+      console.error(`Failed to write stub: ${(e as Error).message}`);
+      process.exit(1);
+    }
+  } else {
+    process.stdout.write(stub);
+  }
+  console.log(`  Entities: ${result.entities.length}`);
+  if (result.unparsed.length > 0) console.log(`  Unparsed: ${result.unparsed.length} file(s)`);
+}
+
+// ─── Diff-spec: spec ↔ source drift (Phase 20) ────────────────────────────────
+//
+// Compares a .marrow spec's entity declarations against the entity shapes
+// inferred from a TypeScript project. Reports per-entity additions /
+// removals / type changes. Useful as a CI check: PRs that change the
+// schema in code without updating the spec become visible.
+
+function runDiffSpec(args: string[]) {
+  if (args.length < 2) {
+    console.error("Usage: marrowc diff-spec <spec.marrow> <project_dir>");
+    process.exit(1);
+  }
+  const specPath = path.resolve(args[0]);
+  const projectDir = path.resolve(args[1]);
+  if (!fs.existsSync(specPath)) { console.error(`Spec not found: ${specPath}`); process.exit(1); }
+  if (!fs.existsSync(projectDir) || !fs.statSync(projectDir).isDirectory()) {
+    console.error(`Not a directory: ${projectDir}`); process.exit(1);
+  }
+  // Load the spec via the existing pipeline.
+  const source = fs.readFileSync(specPath, "utf-8");
+  const tokens = new Lexer(source).tokenize();
+  const ast = new Parser(tokens).parse();
+  const errs = new TypeChecker().check(ast);
+  if (errs.length > 0) {
+    console.error("Spec has type errors:");
+    for (const e of errs.slice(0, 10)) console.error(`  ${e.code}: ${e.message}`);
+    process.exit(1);
+  }
+  const sourceHash = createHash("sha256").update(source).digest("hex").slice(0, 16);
+  const irSystems = new Lowering().lower(ast, sourceHash);
+  // Translate IR entities into ReflectedEntity[] using the same projection
+  // shape so diffEntities can compare cleanly.
+  const specEntities: ReflectedEntity[] = [];
+  for (const sys of irSystems) {
+    for (const mod of sys.modules) {
+      // api_service modules wrap entities. The first model in each is the entity.
+      if (mod.kind !== "api_service") continue;
+      const m = mod.models[0];
+      if (!m) continue;
+      // Skip ontology fields (id / created_at / updated_at) so the diff
+      // matches what reflect emits (the stub omits them).
+      const fields = m.fields.filter(f => f.name !== "id" && f.name !== "created_at" && f.name !== "updated_at");
+      specEntities.push({
+        name: m.name,
+        source_file: specPath,
+        fields: fields.map(f => ({ name: f.name, type: f.type, optional: f.nullable })),
+      });
+    }
+  }
+  // Sort fields alphabetically (same as reflect does) for consistent diff output.
+  for (const e of specEntities) e.fields.sort((a, b) => a.name.localeCompare(b.name));
+  specEntities.sort((a, b) => a.name.localeCompare(b.name));
+
+  const sourceResult = reflectProject(projectDir);
+  // Strip ontology fields from source-side too so the diff is symmetric.
+  for (const e of sourceResult.entities) {
+    e.fields = e.fields.filter(f => f.name !== "id" && f.name !== "created_at" && f.name !== "updated_at");
+  }
+
+  const diff = diffEntities(specEntities, sourceResult.entities);
+  console.log(formatDiff(diff));
+
+  // Exit non-zero when there's drift so CI can fail the PR.
+  if (diff.source_only.length > 0 || diff.spec_only.length > 0 || diff.field_diffs.length > 0) {
+    process.exit(1);
+  }
+}
+
+// ─── Tune-router: aggregate traces against router policy (Phase 19 v2) ───────
+//
+// Reads recorded cognition trace dumps (the JSON shape `marrowc replay`
+// writes) and reports per-tier metrics for a named router. When the router
+// declares a policy: clause, the tuner checks each constraint against the
+// observed metrics and surfaces suggestions when constraints fail.
+//
+// Read-only — the .marrow source stays the source of truth. Suggestions are
+// printed to stdout; the human edits the spec.
+//
+// Usage:
+//   marrowc tune-router <name> --spec <file.marrow> --traces <dir>
+//   marrowc tune-router <name> --spec <file.marrow> --traces <dir> --json
+
+function runTuneRouter(args: string[]) {
+  if (args.length === 0) {
+    console.error("Usage: marrowc tune-router <name> --spec <file.marrow> --traces <dir> [--json] [--apply]");
+    process.exit(1);
+  }
+  const routerName = args[0];
+  let specPath: string | null = null;
+  let tracesDir: string | null = null;
+  let asJson = false;
+  let apply = false;
+  for (let i = 1; i < args.length; i++) {
+    if (args[i] === "--spec" && args[i + 1]) { specPath = path.resolve(args[i + 1]); i++; }
+    else if (args[i] === "--traces" && args[i + 1]) { tracesDir = path.resolve(args[i + 1]); i++; }
+    else if (args[i] === "--json") asJson = true;
+    else if (args[i] === "--apply") apply = true;
+  }
+  if (!specPath || !tracesDir) {
+    console.error("Both --spec and --traces are required.");
+    process.exit(1);
+    return;
+  }
+  if (!fs.existsSync(specPath)) { console.error(`Spec not found: ${specPath}`); process.exit(1); return; }
+  if (!fs.existsSync(tracesDir) || !fs.statSync(tracesDir).isDirectory()) {
+    console.error(`Traces dir not found: ${tracesDir}`); process.exit(1); return;
+  }
+
+  // Load + lower the spec to find the router IR.
+  const source = fs.readFileSync(specPath, "utf-8");
+  const tokens = new Lexer(source).tokenize();
+  const ast = new Parser(tokens).parse();
+  const errs = new TypeChecker().check(ast);
+  if (errs.length > 0) {
+    console.error("Spec has type errors:");
+    for (const e of errs.slice(0, 10)) console.error(`  ${e.code}: ${e.message}`);
+    process.exit(1);
+  }
+  const sourceHash = createHash("sha256").update(source).digest("hex").slice(0, 16);
+  const irSystems = new Lowering().lower(ast, sourceHash);
+  let router = null;
+  for (const sys of irSystems) {
+    const found = sys.routers.find(r => r.name === routerName);
+    if (found) { router = found; break; }
+  }
+  if (!router) {
+    console.error(`Router '${routerName}' not found in ${path.basename(specPath)}`);
+    process.exit(1);
+    return;
+  }
+
+  // Load every JSON file in the traces dir. The `marrowc replay` command
+  // writes one file per trace_id; the tuner aggregates across all of them.
+  const allSpans: Parameters<typeof tuneRouter>[1] = [];
+  const entries = fs.readdirSync(tracesDir)
+    .filter(f => f.endsWith(".json"))
+    .sort(); // deterministic order
+  for (const f of entries) {
+    let raw: string;
+    try { raw = fs.readFileSync(path.join(tracesDir, f), "utf-8"); } catch { continue; }
+    let parsed: unknown;
+    try { parsed = JSON.parse(raw); } catch { continue; }
+    if (Array.isArray(parsed)) {
+      for (const s of parsed) allSpans.push(s as Parameters<typeof tuneRouter>[1][0]);
+    }
+  }
+
+  const report = tuneRouter(router, allSpans);
+  if (asJson) {
+    console.log(JSON.stringify(report, null, 2));
+  } else {
+    console.log(formatTuneReport(report));
+  }
+  // --apply: auto-rewrite safe threshold edits into the spec file.
+  if (apply && specPath) {
+    const rewrite = applyTuneRewrites(specPath, router, report);
+    if (rewrite.written) {
+      console.log("");
+      console.log("Auto-applied edits:");
+      for (const e of rewrite.applied) {
+        console.log(`  v ${e.tier}: max ${e.oldMax} → ${e.newMax} (line ${e.line})`);
+      }
+      if (rewrite.skipped.length > 0) {
+        console.log("Skipped:");
+        for (const s of rewrite.skipped) console.log(`  - ${s}`);
+      }
+      console.log(`Backup written to: ${specPath}.bak`);
+    } else {
+      console.log("\n--apply: no safe edits to apply.");
+      if (rewrite.skipped.length > 0) {
+        for (const s of rewrite.skipped) console.log(`  - ${s}`);
+      }
+    }
+  }
+  // Exit non-zero when any policy constraint fails so CI can surface drift.
+  const anyFail = report.constraints.some(c => c.observed.some(o => !o.passes));
+  process.exit(anyFail ? 1 : 0);
+}
+
+// ─── Reflect-LLM: Phase 20 v2 — LLM-driven inference ─────────────────────────
+//
+// Walks a TypeScript project, finds entity-shaped declarations via static
+// analysis (Phase 20 v1), then prompts an LLM through a closed tool list
+// to infer capabilities operating on those entities. Emits an enriched
+// .marrow stub combining both.
+//
+// Provider defaults to LM Studio at http://127.0.0.1:1234/v1; override via
+// --endpoint or LLM_REFLECT_ENDPOINT. Model defaults to gpt-4o-mini;
+// override via --model or LLM_REFLECT_MODEL.
+
+function runReflectLLM(args: string[]) {
+  if (args.length === 0) {
+    console.error("Usage: marrowc reflect-llm <project_dir> [--out <file>] [--system <name>] [--endpoint <url>] [--model <name>] [--max-tool-calls <n>]");
+    process.exit(1);
+  }
+  const root = path.resolve(args[0]);
+  if (!fs.existsSync(root) || !fs.statSync(root).isDirectory()) {
+    console.error(`Not a directory: ${root}`);
+    process.exit(1);
+  }
+  let outPath: string | null = null;
+  let systemName = path.basename(root);
+  let endpoint: string | undefined;
+  let model: string | undefined;
+  let maxToolCalls: number | undefined;
+  for (let i = 1; i < args.length; i++) {
+    if (args[i] === "--out" && args[i + 1]) { outPath = path.resolve(args[i + 1]); i++; }
+    else if (args[i] === "--system" && args[i + 1]) { systemName = args[i + 1]; i++; }
+    else if (args[i] === "--endpoint" && args[i + 1]) { endpoint = args[i + 1]; i++; }
+    else if (args[i] === "--model" && args[i + 1]) { model = args[i + 1]; i++; }
+    else if (args[i] === "--max-tool-calls" && args[i + 1]) { maxToolCalls = parseInt(args[i + 1], 10); i++; }
+  }
+  systemName = systemName.replace(/[^A-Za-z0-9_]/g, "_");
+  if (/^[0-9]/.test(systemName)) systemName = "S_" + systemName;
+
+  const provider = endpoint ? new ReflectLLMProvider(endpoint) : undefined;
+  console.log(`Phase 20 v2: walking ${path.relative(process.cwd(), root)} with model=${model ?? "default"}…`);
+  reflectProjectWithLLM({
+    root,
+    provider,
+    model,
+    maxToolCalls,
+  }).then(({ static_result, llm_result, sm_result }) => {
+    const stub = emitEnrichedStub(systemName, static_result, llm_result, sm_result);
+    if (outPath) {
+      try {
+        fs.mkdirSync(path.dirname(outPath), { recursive: true });
+        fs.writeFileSync(outPath, stub, "utf-8");
+        console.log(`v Wrote enriched stub: ${path.relative(process.cwd(), outPath)}`);
+      } catch (e) {
+        console.error(`Failed to write stub: ${(e as Error).message}`);
+        process.exit(1);
+      }
+    } else {
+      process.stdout.write(stub);
+    }
+    console.log(`  Entities: ${static_result.entities.length}`);
+    console.log(`  Inferred capabilities: ${llm_result.capabilities.length}`);
+    console.log(`  Inferred state machines: ${sm_result.state_machines.length}`);
+    console.log(`  Tool calls: ${llm_result.trace.tool_calls + sm_result.trace.tool_calls}, tokens: ${llm_result.trace.total_prompt_tokens + llm_result.trace.total_completion_tokens + sm_result.trace.total_prompt_tokens + sm_result.trace.total_completion_tokens}${llm_result.trace.budget_exceeded || sm_result.trace.budget_exceeded ? " (BUDGET EXCEEDED)" : ""}`);
+  }).catch(err => {
+    console.error(`reflect-llm failed: ${err && err.message ? err.message : String(err)}`);
+    process.exit(1);
+  });
+}
 
 // ─── Compile (SQLite target) ──────────────────────────────────────────────────
 
 function runCompileSqlite(source: string, resolved: string) {
   try {
     const tokens = new Lexer(source).tokenize();
-    console.log(`  [1/5] Lexed: ${tokens.length} tokens`);
+    console.log(`  [1/7] Lexed: ${tokens.length} tokens`);
 
     const loader = new ModuleLoader();
     const loadResult = loader.load(resolved);
@@ -950,28 +1448,41 @@ function runCompileSqlite(source: string, resolved: string) {
       if (!loadResult.ast) process.exit(1);
     }
     const ast = loadResult.ast!;
-    console.log(`  [2/5] Parsed: ${ast.systems.length} system(s)`);
+    console.log(`  [2/7] Parsed: ${ast.systems.length} system(s)`);
 
     const typeErrors = new TypeChecker().check(ast);
     if (typeErrors.length > 0) {
-      console.log(`  [3/5] Type check: ${typeErrors.length} error(s)`);
+      console.log(`  [3/7] Type check: ${typeErrors.length} error(s)`);
       for (const err of typeErrors) {
         console.log(`         ${err.code} at ${err.loc.line}:${err.loc.column}: ${err.message}`);
       }
     } else {
-      console.log(`  [3/5] Type check: v (0 errors)`);
+      console.log(`  [3/7] Type check: v (0 errors)`);
     }
 
     const sourceHash = createHash("sha256").update(source).digest("hex").slice(0, 16);
-    const irSystems = new Lowering().lower(ast, sourceHash);
-    console.log(`  [4/5] Lowered to IR: ${irSystems.reduce((s, sys) => s + sys.modules.length, 0)} modules`);
+    const lowering = new Lowering();
+    const irSystems = lowering.lower(ast, sourceHash);
+    console.log(`  [4/7] Lowered to IR: ${irSystems.reduce((s, sys) => s + sys.modules.length, 0)} modules`);
+
+    // Run optimize + solver so the FullEmitter produces complete output.
+    for (let i = 0; i < irSystems.length; i++) {
+      const result = optimize(irSystems[i]);
+      irSystems[i] = result.system;
+    }
+    const solver = new ConstraintSolver();
+    for (const sys of irSystems) {
+      const result = solver.solve(sys);
+      sys.resolution = result.resolution;
+    }
+    console.log(`  [5/7] Optimize + solve: v`);
 
     const emitter = new SqliteEmitter();
     const allFiles: ReturnType<typeof emitter.emit> = [];
     for (const sys of irSystems) {
       allFiles.push(...emitter.emit(sys));
     }
-    console.log(`  [5/5] SQLite emit: ${allFiles.length} file(s)`);
+    console.log(`  [6/7] SQLite emit: ${allFiles.length} file(s)`);
 
     const outputDir = path.resolve(path.dirname(resolved), "output-sqlite");
     for (const f of allFiles) {
@@ -980,10 +1491,15 @@ function runCompileSqlite(source: string, resolved: string) {
       if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
       fs.writeFileSync(outPath, f.content, "utf-8");
     }
+    console.log(`  [7/7] Wrote ${allFiles.length} files to ${path.basename(outputDir)}/`);
 
-    console.log(`\nv SQLite compilation complete. ${allFiles.length} file(s) written to output-sqlite/`);
+    console.log(`\nv SQLite compilation complete.`);
     console.log(`\nNext steps:`);
-    console.log(`  cd output-sqlite && npm install && npm run migrate`);
+    console.log(`  cd output-sqlite`);
+    console.log(`  npm install`);
+    console.log(`  npm run migrate`);
+    console.log(`  npm run dev`);
+    console.log(`  # → http://localhost:3000`);
   } catch (e: any) {
     console.error(`x ${e.message}`);
     process.exit(1);

@@ -1,8 +1,8 @@
-# BoneScript Semantic Model
+# MarrowScript Semantic Model
 
 ## 1. Purpose
 
-This document defines what BoneScript programs MEAN â€” not what they look like
+This document defines what MarrowScript programs MEAN â€” not what they look like
 (grammar) or what types they have (type system), but what they DENOTE.
 
 We use **denotational semantics**: each syntactic construct maps to a
@@ -13,7 +13,7 @@ mathematical object. This gives us:
 
 ## 2. Semantic Domains
 
-A BoneScript program denotes a **System Configuration** â€” a mathematical object
+A MarrowScript program denotes a **System Configuration** â€” a mathematical object
 that fully specifies a software system's behavior.
 
 ### 2.1 Domain Definitions
@@ -165,7 +165,7 @@ Failure semantics: if step N fails, compensate steps N-1, N-2, ..., 1 in reverse
 
 ## 4. System Invariants (Always True)
 
-A valid BoneScript system satisfies these meta-invariants at ALL times:
+A valid MarrowScript system satisfies these meta-invariants at ALL times:
 
 1. **State Consistency**: After any capability execution, all entity constraints hold.
    ```
@@ -194,7 +194,7 @@ A valid BoneScript system satisfies these meta-invariants at ALL times:
 
 ## 5. Determinism Theorem
 
-**Theorem**: For any BoneScript program P and initial state Sâ‚€, the compiled system's
+**Theorem**: For any MarrowScript program P and initial state Sâ‚€, the compiled system's
 behavior is fully determined by the sequence of external inputs.
 
 **Proof sketch**:

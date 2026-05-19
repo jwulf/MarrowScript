@@ -1,11 +1,11 @@
-# BoneScript Language Specification v0.1
+# MarrowScript Language Specification v0.1
 
-## 1. What BoneScript Is
+## 1. What MarrowScript Is
 
-BoneScript (Conceptual-Virtual Intent-Based Execution) is a **formal declarative language** 
+MarrowScript (Conceptual-Virtual Intent-Based Execution) is a **formal declarative language** 
 whose source programs describe software systems as **constrained intent graphs**.
 
-A BoneScript program is NOT natural language. It is a structured declaration that:
+A MarrowScript program is NOT natural language. It is a structured declaration that:
 - Has a defined grammar (PEG)
 - Operates over a closed ontology of software concepts
 - Is compiled through constraint solving (not template matching)
@@ -13,11 +13,11 @@ A BoneScript program is NOT natural language. It is a structured declaration tha
 
 ## 2. Core Insight
 
-The fundamental problem BoneScript solves:
+The fundamental problem MarrowScript solves:
 
 > Human intent is ambiguous. Software must not be.
 
-BoneScript bridges this gap NOT by guessing (heuristics) but by:
+MarrowScript bridges this gap NOT by guessing (heuristics) but by:
 1. Restricting the input space to a formal grammar
 2. Defining a closed ontology of concepts with fixed semantics
 3. Using constraint propagation to resolve all ambiguity at compile time
@@ -33,9 +33,9 @@ BoneScript bridges this gap NOT by guessing (heuristics) but by:
 | Decidability | Compilation always terminates |
 | Minimality | Output contains no components not required by the intent graph |
 
-## 4. What a BoneScript Program Looks Like
+## 4. What a MarrowScript Program Looks Like
 
-```BoneScript
+```MarrowScript
 system InventoryPlatform {
   domain: multiplayer_game
 
@@ -76,7 +76,7 @@ This is NOT pseudocode. Every token has formal semantics defined in this spec.
 ## 5. Compilation Model
 
 ```
-Source (.bone)
+Source (.marrow)
     â”‚
     â–¼
 â”Œâ”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”
@@ -125,3 +125,20 @@ Source (.bone)
 - `08_DETERMINISM.md` â€” Proof of deterministic compilation
 - `09_CODEGEN.md` â€” Target emission rules
 - `10_MAINTENANCE_MODEL.md` â€” Self-monitoring specification
+- `11_COGNITION_LAYER.md` — LLM Harness (model, prompt, router, cognition: catalog, traces)
+- `12_PHASES_14_22.md` — LLM cognition polish (multi-file output, tools, evaluation, checkpoint, promptbook, cost-aware routing, code-spec sync, cost budgets, replay-as-test)
+
+## 7. Cognition Layer (LLM Harness)
+
+MarrowScript ships an additive cognition layer for orchestrating weak/small language models (1B–8B) deterministically. Adding a `model`, `prompt`, `router`, or `cognition:` modifier to a `.marrow` file activates the harness emitters; without them, the language compiles exactly as it does for non-cognition projects.
+
+The harness is constrained by construction:
+
+- **Models** are declared with typed budgets and provider adapters (`ollama`, `openai_compat`, `llamacpp`, `koboldcpp`, `http`).
+- **Prompts** are typed contracts with structured validation, bounded retry, optional repair, and an optional cache.
+- **Routers** are deterministic decision trees over an explicit ordered tier ladder. Same input → same tier.
+- **Cognition primitives** (`vote`, `semantic_slice`, `compress_context`, etc.) are drawn from a closed catalog. The compiler never invents new ones.
+
+Non-determinism is confined to model invocation. Every boundary writes a span to `cognition_traces`; replays are reproducible via `marrowc replay <trace_id>`.
+
+See `11_COGNITION_LAYER.md` for the full specification.

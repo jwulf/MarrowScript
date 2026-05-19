@@ -1,6 +1,6 @@
 /**
- * BoneScript Formatter â€” `bone fmt`
- * Canonicalizes whitespace and formatting in .bone source files.
+ * MarrowScript Formatter â€” `bone fmt`
+ * Canonicalizes whitespace and formatting in .marrow source files.
  *
  * Rules:
  * - 2-space indentation

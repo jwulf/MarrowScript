@@ -1,0 +1,224 @@
+{
+  "version": 1,
+  "source_hash": "7946deed60f4b04f",
+  "source_file": "MarrowForge.marrow",
+  "mappings": [
+    {
+      "generated_file": "src/routes/forgerequeststore.ts",
+      "generated_line": 1,
+      "bone_line": 1,
+      "bone_column": 1,
+      "description": "Module: ForgeRequestStore"
+    },
+    {
+      "generated_file": "src/routes/forgeresultstore.ts",
+      "generated_line": 1,
+      "bone_line": 11,
+      "bone_column": 1,
+      "description": "Module: ForgeResultStore"
+    },
+    {
+      "generated_file": "src/routes/repoforgerequeststore.ts",
+      "generated_line": 1,
+      "bone_line": 21,
+      "bone_column": 1,
+      "description": "Module: RepoForgeRequestStore"
+    },
+    {
+      "generated_file": "src/routes/forgerequest.ts",
+      "generated_line": 1,
+      "bone_line": 31,
+      "bone_column": 1,
+      "description": "Module: ForgeRequestService"
+    },
+    {
+      "generated_file": "src/routes/forgerequest.ts",
+      "generated_line": 41,
+      "bone_line": 41,
+      "bone_column": 3,
+      "description": "Capability: create"
+    },
+    {
+      "generated_file": "src/routes/forgerequest.ts",
+      "generated_line": 46,
+      "bone_line": 46,
+      "bone_column": 3,
+      "description": "Capability: read"
+    },
+    {
+      "generated_file": "src/routes/forgerequest.ts",
+      "generated_line": 51,
+      "bone_line": 51,
+      "bone_column": 3,
+      "description": "Capability: update"
+    },
+    {
+      "generated_file": "src/routes/forgerequest.ts",
+      "generated_line": 56,
+      "bone_line": 56,
+      "bone_column": 3,
+      "description": "Capability: delete"
+    },
+    {
+      "generated_file": "src/routes/forgerequest.ts",
+      "generated_line": 61,
+      "bone_line": 61,
+      "bone_column": 3,
+      "description": "Capability: list"
+    },
+    {
+      "generated_file": "src/routes/forgerequest.ts",
+      "generated_line": 66,
+      "bone_line": 66,
+      "bone_column": 3,
+      "description": "Capability: slice_codebase"
+    },
+    {
+      "generated_file": "src/routes/forgerequest.ts",
+      "generated_line": 71,
+      "bone_line": 71,
+      "bone_column": 3,
+      "description": "Capability: forge"
+    },
+    {
+      "generated_file": "src/routes/forgerequest.ts",
+      "generated_line": 76,
+      "bone_line": 76,
+      "bone_column": 3,
+      "description": "Capability: scope_request"
+    },
+    {
+      "generated_file": "src/routes/forgerequest.ts",
+      "generated_line": 81,
+      "bone_line": 81,
+      "bone_column": 3,
+      "description": "Capability: generate_request"
+    },
+    {
+      "generated_file": "src/routes/forgeresult.ts",
+      "generated_line": 1,
+      "bone_line": 86,
+      "bone_column": 1,
+      "description": "Module: ForgeResultService"
+    },
+    {
+      "generated_file": "src/routes/forgeresult.ts",
+      "generated_line": 96,
+      "bone_line": 96,
+      "bone_column": 3,
+      "description": "Capability: create"
+    },
+    {
+      "generated_file": "src/routes/forgeresult.ts",
+      "generated_line": 101,
+      "bone_line": 101,
+      "bone_column": 3,
+      "description": "Capability: read"
+    },
+    {
+      "generated_file": "src/routes/forgeresult.ts",
+      "generated_line": 106,
+      "bone_line": 106,
+      "bone_column": 3,
+      "description": "Capability: update"
+    },
+    {
+      "generated_file": "src/routes/forgeresult.ts",
+      "generated_line": 111,
+      "bone_line": 111,
+      "bone_column": 3,
+      "description": "Capability: delete"
+    },
+    {
+      "generated_file": "src/routes/forgeresult.ts",
+      "generated_line": 116,
+      "bone_line": 116,
+      "bone_column": 3,
+      "description": "Capability: list"
+    },
+    {
+      "generated_file": "src/routes/forgeresult.ts",
+      "generated_line": 121,
+      "bone_line": 121,
+      "bone_column": 3,
+      "description": "Capability: save_forge_result"
+    },
+    {
+      "generated_file": "src/routes/forgeresult.ts",
+      "generated_line": 126,
+      "bone_line": 126,
+      "bone_column": 3,
+      "description": "Capability: mark_forge_failed"
+    },
+    {
+      "generated_file": "src/routes/repoforgerequest.ts",
+      "generated_line": 1,
+      "bone_line": 131,
+      "bone_column": 1,
+      "description": "Module: RepoForgeRequestService"
+    },
+    {
+      "generated_file": "src/routes/repoforgerequest.ts",
+      "generated_line": 141,
+      "bone_line": 141,
+      "bone_column": 3,
+      "description": "Capability: create"
+    },
+    {
+      "generated_file": "src/routes/repoforgerequest.ts",
+      "generated_line": 146,
+      "bone_line": 146,
+      "bone_column": 3,
+      "description": "Capability: read"
+    },
+    {
+      "generated_file": "src/routes/repoforgerequest.ts",
+      "generated_line": 151,
+      "bone_line": 151,
+      "bone_column": 3,
+      "description": "Capability: update"
+    },
+    {
+      "generated_file": "src/routes/repoforgerequest.ts",
+      "generated_line": 156,
+      "bone_line": 156,
+      "bone_column": 3,
+      "description": "Capability: delete"
+    },
+    {
+      "generated_file": "src/routes/repoforgerequest.ts",
+      "generated_line": 161,
+      "bone_line": 161,
+      "bone_column": 3,
+      "description": "Capability: list"
+    },
+    {
+      "generated_file": "src/routes/repoforgerequest.ts",
+      "generated_line": 166,
+      "bone_line": 166,
+      "bone_column": 3,
+      "description": "Capability: ingest_repo_a"
+    },
+    {
+      "generated_file": "src/routes/repoforgerequest.ts",
+      "generated_line": 171,
+      "bone_line": 171,
+      "bone_column": 3,
+      "description": "Capability: ingest_repo_b"
+    },
+    {
+      "generated_file": "src/routes/repoforgerequest.ts",
+      "generated_line": 176,
+      "bone_line": 176,
+      "bone_column": 3,
+      "description": "Capability: forge_from_repos"
+    },
+    {
+      "generated_file": "src/routes/apigateway.ts",
+      "generated_line": 1,
+      "bone_line": 181,
+      "bone_column": 1,
+      "description": "Module: APIGateway"
+    }
+  ]
+}

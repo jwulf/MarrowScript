@@ -1,5 +1,5 @@
 /**
- * BoneScript VS Code Extension — Client for the BoneScript Language Server.
+ * MarrowScript VS Code Extension — Client for the MarrowScript Language Server.
  */
 
 import * as path from "path";
@@ -26,13 +26,13 @@ export function activate(context: ExtensionContext) {
   const clientOptions: LanguageClientOptions = {
     documentSelector: [{ scheme: "file", language: "bone" }],
     synchronize: {
-      fileEvents: workspace.createFileSystemWatcher("**/*.bone"),
+      fileEvents: workspace.createFileSystemWatcher("**/*.marrow"),
     },
   };
 
   client = new LanguageClient(
-    "bonescriptLSP",
-    "BoneScript Language Server",
+    "marrowscriptLSP",
+    "MarrowScript Language Server",
     serverOptions,
     clientOptions
   );

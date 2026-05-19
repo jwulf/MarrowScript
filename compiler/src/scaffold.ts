@@ -1,6 +1,6 @@
 /**
- * BoneScript Project Scaffolder â€” `bone init`
- * Creates a new BoneScript project with sensible defaults for a chosen domain.
+ * MarrowScript Project Scaffolder â€” `bone init`
+ * Creates a new MarrowScript project with sensible defaults for a chosen domain.
  */
 
 import * as fs from "fs";
@@ -12,10 +12,11 @@ export type ScaffoldDomain =
   | "iot_system"
   | "social_network"
   | "marketplace"
-  | "realtime_collaboration";
+  | "realtime_collaboration"
+  | "cognitive_scaffold";
 
 const TEMPLATES: Record<ScaffoldDomain, string> = {
-  multiplayer_game: `// Compile with: bonec compile {name}.bone --target nakama
+  multiplayer_game: `// Compile with: marrowc compile {name}.marrow --target nakama
 // for Nakama TypeScript runtime output instead of Express/PostgreSQL
 system MyGame {
   domain: multiplayer_game
@@ -330,6 +331,93 @@ system MyGame {
   }
 }
 `,
+
+  cognitive_scaffold: `// Compile with: marrowc compile {name}.marrow
+// LLM Harness scaffold — model-agnostic deterministic orchestration over
+// weak/small language models. The compiler emits providers, prompts, router,
+// validation, repair, cache, budget, and traces. The model is constrained;
+// the runtime is intelligent.
+system MyHarness {
+  domain: cognitive_scaffold
+
+  // ── Entities ──────────────────────────────────────────────────────────────
+
+  entity Doc {
+    owns: [
+      title: string,
+      body: string,
+      kind: string
+    ]
+    constraints: [
+      kind in ["bug", "feature", "question"]
+    ]
+  }
+
+  // ── Stores ────────────────────────────────────────────────────────────────
+
+  store DocStore {
+    engine: postgresql
+    schema: {
+      id: uuid,
+      title: string,
+      body: string,
+      kind: string,
+      created_at: timestamp,
+      updated_at: timestamp
+    }
+  }
+
+  // ── Extension points (prompt bodies live here, preserved across recompile)─
+
+  extension_point tmpl_classify(body: string) {
+    returns: string
+    stable: true
+  }
+
+  // ── Models ────────────────────────────────────────────────────────────────
+
+  model Tiny {
+    provider: ollama
+    name: "qwen2.5-coder:1.5b"
+    context_window: 32000
+    max_output: 256
+    temperature: 0.0
+    cost_class: tiny
+    latency_class: fast
+  }
+
+  // ── Prompt ────────────────────────────────────────────────────────────────
+
+  prompt classify(body: string) {
+    model: Tiny
+    template: "extension_point:tmpl_classify"
+    returns: string
+    timeout: 5s
+    idempotent: true
+    validate: schema_only
+    on_invalid: retry
+    retry: { max_attempts: 2, backoff: fixed, interval: 200ms }
+    cache: { key: hash(body), ttl: 1h }
+  }
+
+  // ── Capability ────────────────────────────────────────────────────────────
+
+  capability assign_kind(d: Doc, kind: string) {
+    requires: [
+      kind in ["bug", "feature", "question"]
+    ]
+    effects: [d.kind = kind]
+    sync: transactional
+  }
+
+  // ── Policy (audit + rate-limit) ───────────────────────────────────────────
+
+  policy harness {
+    rate_limit: 60 per 1m
+    audit: true
+  }
+}
+`,
 };
 
 export interface ScaffoldOptions {
@@ -345,11 +433,13 @@ export function scaffold(opts: ScaffoldOptions): { created: string[] } {
     fs.mkdirSync(opts.outDir, { recursive: true });
   }
 
-  // Main .bone file
-  const mainFile = path.join(opts.outDir, `${opts.name}.bone`);
+  // Main .marrow file
+  const mainFile = path.join(opts.outDir, `${opts.name}.marrow`);
   let content = TEMPLATES[opts.domain];
-  // Replace placeholder system name with provided name
-  content = content.replace(/^system \w+ \{/, `system ${pascalCase(opts.name)} {`);
+  // Replace the placeholder `system <Name> {` with the user's project name.
+  // We use a multiline regex anchored on word boundary so templates that lead
+  // with header comments still get rewritten correctly.
+  content = content.replace(/\bsystem\s+\w+\s*\{/, `system ${pascalCase(opts.name)} {`);
   fs.writeFileSync(mainFile, content, "utf-8");
   created.push(mainFile);
 
@@ -357,12 +447,12 @@ export function scaffold(opts: ScaffoldOptions): { created: string[] } {
   const readmePath = path.join(opts.outDir, "README.md");
   fs.writeFileSync(readmePath, `# ${opts.name}
 
-BoneScript project (domain: ${opts.domain}).
+MarrowScript project (domain: ${opts.domain}).
 
 ## Compile
 
 \`\`\`bash
-bone compile ${opts.name}.bone
+bone compile ${opts.name}.marrow
 \`\`\`
 
 The output will be written to \`./output/\` as a complete Node.js project.

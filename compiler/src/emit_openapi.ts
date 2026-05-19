@@ -1,5 +1,5 @@
 /**
- * BoneScript OpenAPI Emitter
+ * MarrowScript OpenAPI Emitter
  * Generates OpenAPI 3.0.3 YAML and JSON specs from an IRSystem.
  */
 
@@ -260,6 +260,69 @@ function buildSpec(system: IR.IRSystem): Record<string, unknown> {
 
     for (const method of capabilityMethods) {
       const capPath = collectionPath + "/" + toDashCase(method.name);
+      // Build an operation-specific request schema from the method's typed
+      // inputs. Entity-typed inputs map to the entity's $ref so the caller
+      // can post the full entity body inline (the route handler accepts
+      // either an `<entity>_id` reference or the inline body); primitive
+      // inputs map to their JSON-schema equivalent. This gives the frontend
+      // / OpenAPI codegen tools a precise shape per capability instead of
+      // the previous generic entity-shaped requestBody.
+      const capRequestProps: Record<string, unknown> = {};
+      const capRequestRequired: string[] = [];
+      const PRIMITIVE_MAP: Record<string, unknown> = {
+        string: { type: "string" },
+        int: { type: "integer" },
+        uint: { type: "integer", minimum: 0 },
+        float: { type: "number" },
+        bool: { type: "boolean" },
+        timestamp: { type: "string", format: "date-time" },
+        uuid: { type: "string", format: "uuid" },
+        bytes: { type: "string", format: "byte" },
+        json: { type: "object", additionalProperties: true },
+      };
+      for (const inp of method.input) {
+        const isPrimitive = inp.type in PRIMITIVE_MAP;
+        if (isPrimitive) {
+          capRequestProps[inp.name] = PRIMITIVE_MAP[inp.type];
+          capRequestRequired.push(inp.name);
+        } else if (inp.type.startsWith("list<") || inp.type.startsWith("set<")) {
+          capRequestProps[inp.name] = { type: "array", items: {} };
+        } else {
+          // Entity-typed input. Frontend may send either `<name>_id` (UUID
+          // reference) or the inline entity body. We document both shapes
+          // via oneOf so OpenAPI codegen still produces a clean type.
+          capRequestProps[inp.name + "_id"] = { type: "string", format: "uuid", description: "UUID of an existing " + inp.type + " row (alternative to inline body)" };
+          // Spread the entity's own properties at the top level so the
+          // caller can post the body inline without nesting.
+          const entityModel = mod.models.find(mm => mm.name === inp.type);
+          if (entityModel) {
+            for (const f of entityModel.fields) {
+              if (!(f.name in capRequestProps)) {
+                capRequestProps[f.name] = irTypeToOpenApi(f.type);
+              }
+            }
+          }
+        }
+      }
+      const isPipeline = !!method.pipeline;
+      const capRequestSchema: Record<string, unknown> = {
+        type: "object",
+        properties: capRequestProps,
+      };
+      if (capRequestRequired.length > 0) capRequestSchema.required = capRequestRequired;
+
+      // Pipeline capabilities surface the typed { ok, action, trace_id,
+      // results } shape — the results map is per-pipeline so we leave it
+      // open. Plain capabilities still return { ok, action }.
+      const successProps: Record<string, unknown> = {
+        ok: { type: "boolean" },
+        action: { type: "string" },
+      };
+      if (isPipeline) {
+        successProps.trace_id = { type: "string", format: "uuid", nullable: true };
+        successProps.results = { type: "object", additionalProperties: true };
+      }
+
       const capOp: Record<string, unknown> = {
         summary: method.name + " on " + modelName,
         operationId: method.name + modelName,
@@ -268,7 +331,7 @@ function buildSpec(system: IR.IRSystem): Record<string, unknown> {
           required: true,
           content: {
             "application/json": {
-              schema: { $ref: "#/components/schemas/" + modelName },
+              schema: capRequestSchema,
             },
           },
         },
@@ -279,17 +342,15 @@ function buildSpec(system: IR.IRSystem): Record<string, unknown> {
               "application/json": {
                 schema: {
                   type: "object",
-                  properties: {
-                    ok: { type: "boolean" },
-                    action: { type: "string" },
-                  },
+                  properties: successProps,
                 },
               },
             },
           },
-          "401": { description: "Unauthorized" },
-          "422": { description: "Precondition failed" },
           "400": { description: "Bad request" },
+          "401": { description: "Unauthorized" },
+          "404": { description: "Not found" },
+          "422": { description: "Precondition failed" },
         },
       };
       if (method.authenticated) {
@@ -313,7 +374,7 @@ function buildSpec(system: IR.IRSystem): Record<string, unknown> {
     info: {
       title: system.name,
       version: system.version,
-      description: "Generated by BoneScript compiler",
+      description: "Generated by MarrowScript compiler",
     },
     servers: [{ url: "http://localhost:3000" }],
     paths,
@@ -334,7 +395,7 @@ function buildSpec(system: IR.IRSystem): Record<string, unknown> {
 
 export function emitOpenApiSpec(system: IR.IRSystem): string {
   const spec = buildSpec(system);
-  const lines: string[] = ["# Generated by BoneScript compiler"];
+  const lines: string[] = ["# Generated by MarrowScript compiler"];
   lines.push(objToYaml(spec));
   return lines.join("\n") + "\n";
 }

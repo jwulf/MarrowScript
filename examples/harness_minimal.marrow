@@ -1,0 +1,175 @@
+// MarrowScript LLM Harness — minimal example
+// Demonstrates the Phase 1 cognition layer: model, prompt, router, and the
+// cognition: modifier on capabilities. The full harness emitter (provider
+// adapters, validation runtime, traces, budget) lands in Phase 2.
+//
+// At Phase 1 the compiler accepts this file end-to-end:
+//   - lexer / parser / type checker pass
+//   - the lowered IR contains the new IRCogModel, IRPrompt, IRRouter records
+//   - any capability with `cognition: <name>` carries the binding into IRMethod
+//
+// What does NOT happen yet (deliberate):
+//   - no /src/cognition/* files in the generated output
+//   - no /src/providers/* files in the generated output
+//   - cognition catalog names are accepted as opaque labels (Phase 2 will
+//     resolve them against compiler/src/cognition_catalog.ts)
+
+system MinimalHarness {
+  domain: cognitive_scaffold
+
+  // ─── Entities ──────────────────────────────────────────────────────────────
+
+  entity Doc {
+    owns: [
+      title: string,
+      body: string,
+      tag: string
+    ]
+    constraints: [
+      tag in ["bug", "feature", "question"]
+    ]
+  }
+
+  entity Task {
+    owns: [
+      description: string,
+      kind: string
+    ]
+    constraints: [
+      kind in ["analyze", "plan", "generate", "validate", "repair"]
+    ]
+  }
+
+  // ─── Stores ────────────────────────────────────────────────────────────────
+
+  store DocStore {
+    engine: postgresql
+    schema: {
+      id: uuid,
+      title: string,
+      body: string,
+      tag: string,
+      created_at: timestamp,
+      updated_at: timestamp
+    }
+  }
+
+  store TaskStore {
+    engine: postgresql
+    schema: {
+      id: uuid,
+      description: string,
+      kind: string,
+      created_at: timestamp,
+      updated_at: timestamp
+    }
+  }
+
+  // ─── Extension points (prompt templates live here) ─────────────────────────
+
+  extension_point tmpl_classify_doc(body: string) {
+    returns: string
+    stable: true
+  }
+
+  extension_point tmpl_summarize_doc(body: string, max_tokens: uint) {
+    returns: string
+    stable: true
+  }
+
+  // ─── Models ────────────────────────────────────────────────────────────────
+
+  model TinyClassifier {
+    provider: ollama
+    name: "qwen2.5-coder:1.5b"
+    context_window: 32000
+    max_output: 512
+    temperature: 0.0
+    cost_class: tiny
+    latency_class: fast
+  }
+
+  model SmallSummarizer {
+    provider: openai_compat
+    endpoint: "http://localhost:8080/v1"
+    name: "phi-3.5-mini"
+    context_window: 128000
+    max_output: 2048
+    temperature: 0.0
+    cost_class: small
+    latency_class: medium
+  }
+
+  // ─── Router (deterministic decision tree) ──────────────────────────────────
+
+  router cheapest_valid {
+    by: input.complexity
+    tier short  { max: 0.3 -> TinyClassifier }
+    tier medium {            -> SmallSummarizer }
+    on_low_confidence: escalate
+    confidence_threshold: 0.65
+    fallback: SmallSummarizer
+  }
+
+  // ─── Capabilities ──────────────────────────────────────────────────────────
+
+  capability tag_doc(d: Doc, tag: string) {
+    requires: [
+      tag in ["bug", "feature", "question"]
+    ]
+    effects: [
+      d.tag = tag
+    ]
+    sync: transactional
+  }
+
+  // Cognition primitive: a closed-catalog name from cognition_catalog.ts
+  // (added in Phase 2). Here we use `compress_context` as a forward example.
+  capability compress_doc(d: Doc) {
+    cognition: compress_context using {
+      history: d.body,
+      target_tokens: 512,
+      strategy: "summarize_oldest"
+    }
+    returns: string
+    sync: eventual
+    idempotent: true
+  }
+
+  // ─── Prompts (typed contracts) ─────────────────────────────────────────────
+
+  prompt classify_doc(body: string) {
+    model: TinyClassifier
+    template: "extension_point:tmpl_classify_doc"
+    returns: string
+    timeout: 5s
+    idempotent: true
+    validate: schema_only
+    on_invalid: retry
+    retry: { max_attempts: 2, backoff: fixed, interval: 200ms }
+    cache: { key: hash(body), ttl: 1h }
+    tools: [tag_doc]
+  }
+
+  prompt summarize_doc(body: string, max_tokens: uint) {
+    router: cheapest_valid
+    template: "extension_point:tmpl_summarize_doc"
+    returns: string
+    timeout: 30s
+    idempotent: true
+    validate: schema_only
+    on_invalid: retry_with_repair_prompt
+    retry: { max_attempts: 3, backoff: exponential, interval: 1s }
+    constraints: [
+      output.length <= max_tokens
+    ]
+  }
+
+  // ─── Policy ────────────────────────────────────────────────────────────────
+
+  policy harness_limits {
+    rate_limit: 60 per 1m
+    audit: true
+    encryption: in_transit
+  }
+}

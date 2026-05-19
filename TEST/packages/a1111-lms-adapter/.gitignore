@@ -1,0 +1,7 @@
+node_modules/
+dist/
+dist-esm/
+*.tsbuildinfo
+.DS_Store
+out.png
+input.png

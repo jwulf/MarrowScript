@@ -1,5 +1,5 @@
 /**
- * BoneScript IR Optimizer — Stage 4.5 (between lowering and codegen).
+ * MarrowScript IR Optimizer — Stage 4.5 (between lowering and codegen).
  * Implements spec/07_IR_SPEC.md §6 (IR Optimization).
  *
  * Passes (applied in order, each idempotent):

@@ -1,8 +1,8 @@
-# BoneScript Self-Maintenance Model Specification
+# MarrowScript Self-Maintenance Model Specification
 
 ## 1. Purpose
 
-Every system compiled by BoneScript includes a **self-maintenance model** â€” a set
+Every system compiled by MarrowScript includes a **self-maintenance model** â€” a set
 of rules that define how the system detects it is incorrect at runtime and
 how it corrects itself deterministically.
 

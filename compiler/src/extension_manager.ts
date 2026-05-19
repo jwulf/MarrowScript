@@ -1,5 +1,5 @@
 /**
- * BoneScript Extension Manager
+ * MarrowScript Extension Manager
  *
  * Handles the escape hatch system: extension_point declarations.
  *
@@ -11,9 +11,9 @@
  * 4. If stable: true and no implementation exists, compilation fails.
  *
  * Sentinel format (must be unique and parseable):
- *   // <bonescript:ext:NAME:begin>
+ *   // <marrowscript:ext:NAME:begin>
  *   ... user code here ...
- *   // <bonescript:ext:NAME:end>
+ *   // <marrowscript:ext:NAME:end>
  */
 
 import * as fs from "fs";
@@ -23,11 +23,11 @@ import * as AST from "./ast";
 // ─── Sentinel Helpers ────────────────────────────────────────────────────────
 
 export function beginSentinel(name: string): string {
-  return `// <bonescript:ext:${name}:begin>`;
+  return `// <marrowscript:ext:${name}:begin>`;
 }
 
 export function endSentinel(name: string): string {
-  return `// <bonescript:ext:${name}:end>`;
+  return `// <marrowscript:ext:${name}:end>`;
 }
 
 export function isStubImplementation(code: string): boolean {
@@ -90,7 +90,7 @@ export interface ExtractedImpl {
 
 export function extractImplementations(existingContent: string): Map<string, ExtractedImpl> {
   const result = new Map<string, ExtractedImpl>();
-  const beginPattern = /\/\/ <bonescript:ext:([^:]+):begin>/g;
+  const beginPattern = /\/\/ <marrowscript:ext:([^:]+):begin>/g;
   let match: RegExpExecArray | null;
 
   while ((match = beginPattern.exec(existingContent)) !== null) {

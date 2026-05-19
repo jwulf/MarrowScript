@@ -1,5 +1,5 @@
 /**
- * BoneScript Algorithm Catalog (Leap 2)
+ * MarrowScript Algorithm Catalog (Leap 2)
  *
  * A closed catalog of named algorithms. Each entry has:
  *   - inputs: typed parameters the user must bind

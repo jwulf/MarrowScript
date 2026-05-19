@@ -1,5 +1,5 @@
 /**
- * BoneScript Module Loader â€” Resolves import declarations across multiple .bone files.
+ * MarrowScript Module Loader â€” Resolves import declarations across multiple .marrow files.
  *
  * Behavior:
  * - Tracks loaded files to avoid cycles

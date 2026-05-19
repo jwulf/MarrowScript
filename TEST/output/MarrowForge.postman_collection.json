@@ -1,0 +1,796 @@
+{
+  "info": {
+    "name": "MarrowForge",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "auth": {
+    "type": "bearer",
+    "bearer": [
+      {
+        "key": "token",
+        "value": "{{token}}",
+        "type": "string"
+      }
+    ]
+  },
+  "variable": [
+    {
+      "key": "baseUrl",
+      "value": "http://localhost:3000"
+    },
+    {
+      "key": "token",
+      "value": ""
+    }
+  ],
+  "item": [
+    {
+      "name": "ForgeRequestService",
+      "item": [
+        {
+          "name": "List ForgeRequests",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/forge_requests",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "forge_requests"
+              ]
+            }
+          }
+        },
+        {
+          "name": "Create ForgeRequest",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/forge_requests",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "forge_requests"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"id\": \"00000000-0000-0000-0000-000000000001\",\n  \"created_at\": \"2024-01-01T00:00:00.000Z\",\n  \"updated_at\": \"2024-01-01T00:00:00.000Z\",\n  \"title\": \"example\",\n  \"description\": \"example\",\n  \"desired_kind\": \"example\",\n  \"target_path\": \"example\",\n  \"complexity\": 1\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "Get ForgeRequest",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/forge_requests/:id",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "forge_requests",
+                ":id"
+              ]
+            }
+          }
+        },
+        {
+          "name": "Update ForgeRequest",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/forge_requests/:id",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "forge_requests",
+                ":id"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"id\": \"00000000-0000-0000-0000-000000000001\",\n  \"created_at\": \"2024-01-01T00:00:00.000Z\",\n  \"updated_at\": \"2024-01-01T00:00:00.000Z\",\n  \"title\": \"example\",\n  \"description\": \"example\",\n  \"desired_kind\": \"example\",\n  \"target_path\": \"example\",\n  \"complexity\": 1\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "Delete ForgeRequest",
+          "request": {
+            "method": "DELETE",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/forge_requests/:id",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "forge_requests",
+                ":id"
+              ]
+            }
+          }
+        },
+        {
+          "name": "slice_codebase ForgeRequest",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/forge_requests/slice-codebase",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "forge_requests",
+                "slice-codebase"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"id\": \"00000000-0000-0000-0000-000000000001\",\n  \"created_at\": \"2024-01-01T00:00:00.000Z\",\n  \"updated_at\": \"2024-01-01T00:00:00.000Z\",\n  \"title\": \"example\",\n  \"description\": \"example\",\n  \"desired_kind\": \"example\",\n  \"target_path\": \"example\",\n  \"complexity\": 1\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "forge ForgeRequest",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/forge_requests/forge",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "forge_requests",
+                "forge"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"id\": \"00000000-0000-0000-0000-000000000001\",\n  \"created_at\": \"2024-01-01T00:00:00.000Z\",\n  \"updated_at\": \"2024-01-01T00:00:00.000Z\",\n  \"title\": \"example\",\n  \"description\": \"example\",\n  \"desired_kind\": \"example\",\n  \"target_path\": \"example\",\n  \"complexity\": 1\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "scope_request ForgeRequest",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/forge_requests/scope-request",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "forge_requests",
+                "scope-request"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"id\": \"00000000-0000-0000-0000-000000000001\",\n  \"created_at\": \"2024-01-01T00:00:00.000Z\",\n  \"updated_at\": \"2024-01-01T00:00:00.000Z\",\n  \"title\": \"example\",\n  \"description\": \"example\",\n  \"desired_kind\": \"example\",\n  \"target_path\": \"example\",\n  \"complexity\": 1\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "generate_request ForgeRequest",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/forge_requests/generate-request",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "forge_requests",
+                "generate-request"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"id\": \"00000000-0000-0000-0000-000000000001\",\n  \"created_at\": \"2024-01-01T00:00:00.000Z\",\n  \"updated_at\": \"2024-01-01T00:00:00.000Z\",\n  \"title\": \"example\",\n  \"description\": \"example\",\n  \"desired_kind\": \"example\",\n  \"target_path\": \"example\",\n  \"complexity\": 1\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "ForgeResultService",
+      "item": [
+        {
+          "name": "List ForgeResults",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/forge_results",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "forge_results"
+              ]
+            }
+          }
+        },
+        {
+          "name": "Create ForgeResult",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/forge_results",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "forge_results"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"id\": \"00000000-0000-0000-0000-000000000001\",\n  \"created_at\": \"2024-01-01T00:00:00.000Z\",\n  \"updated_at\": \"2024-01-01T00:00:00.000Z\",\n  \"request_id\": \"00000000-0000-0000-0000-000000000001\",\n  \"kind\": \"example\",\n  \"summary\": \"example\",\n  \"target_path\": \"example\",\n  \"target_symbol\": \"example\",\n  \"artifact\": \"example\",\n  \"plan\": \"example\",\n  \"confidence\": 1,\n  \"ast_compiles\": true,\n  \"tier_used\": \"example\",\n  \"trace_id\": \"example\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "Get ForgeResult",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/forge_results/:id",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "forge_results",
+                ":id"
+              ]
+            }
+          }
+        },
+        {
+          "name": "Update ForgeResult",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/forge_results/:id",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "forge_results",
+                ":id"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"id\": \"00000000-0000-0000-0000-000000000001\",\n  \"created_at\": \"2024-01-01T00:00:00.000Z\",\n  \"updated_at\": \"2024-01-01T00:00:00.000Z\",\n  \"request_id\": \"00000000-0000-0000-0000-000000000001\",\n  \"kind\": \"example\",\n  \"summary\": \"example\",\n  \"target_path\": \"example\",\n  \"target_symbol\": \"example\",\n  \"artifact\": \"example\",\n  \"plan\": \"example\",\n  \"confidence\": 1,\n  \"ast_compiles\": true,\n  \"tier_used\": \"example\",\n  \"trace_id\": \"example\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "Delete ForgeResult",
+          "request": {
+            "method": "DELETE",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/forge_results/:id",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "forge_results",
+                ":id"
+              ]
+            }
+          }
+        },
+        {
+          "name": "save_forge_result ForgeResult",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/forge_results/save-forge-result",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "forge_results",
+                "save-forge-result"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"id\": \"00000000-0000-0000-0000-000000000001\",\n  \"created_at\": \"2024-01-01T00:00:00.000Z\",\n  \"updated_at\": \"2024-01-01T00:00:00.000Z\",\n  \"request_id\": \"00000000-0000-0000-0000-000000000001\",\n  \"kind\": \"example\",\n  \"summary\": \"example\",\n  \"target_path\": \"example\",\n  \"target_symbol\": \"example\",\n  \"artifact\": \"example\",\n  \"plan\": \"example\",\n  \"confidence\": 1,\n  \"ast_compiles\": true,\n  \"tier_used\": \"example\",\n  \"trace_id\": \"example\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "mark_forge_failed ForgeResult",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/forge_results/mark-forge-failed",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "forge_results",
+                "mark-forge-failed"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"id\": \"00000000-0000-0000-0000-000000000001\",\n  \"created_at\": \"2024-01-01T00:00:00.000Z\",\n  \"updated_at\": \"2024-01-01T00:00:00.000Z\",\n  \"request_id\": \"00000000-0000-0000-0000-000000000001\",\n  \"kind\": \"example\",\n  \"summary\": \"example\",\n  \"target_path\": \"example\",\n  \"target_symbol\": \"example\",\n  \"artifact\": \"example\",\n  \"plan\": \"example\",\n  \"confidence\": 1,\n  \"ast_compiles\": true,\n  \"tier_used\": \"example\",\n  \"trace_id\": \"example\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "RepoForgeRequestService",
+      "item": [
+        {
+          "name": "List RepoForgeRequests",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/repo_forge_requests",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "repo_forge_requests"
+              ]
+            }
+          }
+        },
+        {
+          "name": "Create RepoForgeRequest",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/repo_forge_requests",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "repo_forge_requests"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"id\": \"00000000-0000-0000-0000-000000000001\",\n  \"created_at\": \"2024-01-01T00:00:00.000Z\",\n  \"updated_at\": \"2024-01-01T00:00:00.000Z\",\n  \"title\": \"example\",\n  \"description\": \"example\",\n  \"preset\": \"example\",\n  \"repo_a_url\": \"example\",\n  \"repo_b_url\": \"example\",\n  \"repo_a_ref\": \"example\",\n  \"repo_b_ref\": \"example\",\n  \"target_path\": \"example\",\n  \"complexity\": 1\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "Get RepoForgeRequest",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/repo_forge_requests/:id",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "repo_forge_requests",
+                ":id"
+              ]
+            }
+          }
+        },
+        {
+          "name": "Update RepoForgeRequest",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/repo_forge_requests/:id",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "repo_forge_requests",
+                ":id"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"id\": \"00000000-0000-0000-0000-000000000001\",\n  \"created_at\": \"2024-01-01T00:00:00.000Z\",\n  \"updated_at\": \"2024-01-01T00:00:00.000Z\",\n  \"title\": \"example\",\n  \"description\": \"example\",\n  \"preset\": \"example\",\n  \"repo_a_url\": \"example\",\n  \"repo_b_url\": \"example\",\n  \"repo_a_ref\": \"example\",\n  \"repo_b_ref\": \"example\",\n  \"target_path\": \"example\",\n  \"complexity\": 1\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "Delete RepoForgeRequest",
+          "request": {
+            "method": "DELETE",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/repo_forge_requests/:id",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "repo_forge_requests",
+                ":id"
+              ]
+            }
+          }
+        },
+        {
+          "name": "ingest_repo_a RepoForgeRequest",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/repo_forge_requests/ingest-repo-a",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "repo_forge_requests",
+                "ingest-repo-a"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"id\": \"00000000-0000-0000-0000-000000000001\",\n  \"created_at\": \"2024-01-01T00:00:00.000Z\",\n  \"updated_at\": \"2024-01-01T00:00:00.000Z\",\n  \"title\": \"example\",\n  \"description\": \"example\",\n  \"preset\": \"example\",\n  \"repo_a_url\": \"example\",\n  \"repo_b_url\": \"example\",\n  \"repo_a_ref\": \"example\",\n  \"repo_b_ref\": \"example\",\n  \"target_path\": \"example\",\n  \"complexity\": 1\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "ingest_repo_b RepoForgeRequest",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/repo_forge_requests/ingest-repo-b",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "repo_forge_requests",
+                "ingest-repo-b"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"id\": \"00000000-0000-0000-0000-000000000001\",\n  \"created_at\": \"2024-01-01T00:00:00.000Z\",\n  \"updated_at\": \"2024-01-01T00:00:00.000Z\",\n  \"title\": \"example\",\n  \"description\": \"example\",\n  \"preset\": \"example\",\n  \"repo_a_url\": \"example\",\n  \"repo_b_url\": \"example\",\n  \"repo_a_ref\": \"example\",\n  \"repo_b_ref\": \"example\",\n  \"target_path\": \"example\",\n  \"complexity\": 1\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "forge_from_repos RepoForgeRequest",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/repo_forge_requests/forge-from-repos",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "repo_forge_requests",
+                "forge-from-repos"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"id\": \"00000000-0000-0000-0000-000000000001\",\n  \"created_at\": \"2024-01-01T00:00:00.000Z\",\n  \"updated_at\": \"2024-01-01T00:00:00.000Z\",\n  \"title\": \"example\",\n  \"description\": \"example\",\n  \"preset\": \"example\",\n  \"repo_a_url\": \"example\",\n  \"repo_b_url\": \"example\",\n  \"repo_a_ref\": \"example\",\n  \"repo_b_ref\": \"example\",\n  \"target_path\": \"example\",\n  \"complexity\": 1\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        }
+      ]
+    }
+  ]
+}

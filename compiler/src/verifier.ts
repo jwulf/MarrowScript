@@ -1,5 +1,5 @@
 ﻿/**
- * BoneScript Verifier â€” Stage 7 of the compilation pipeline.
+ * MarrowScript Verifier â€” Stage 7 of the compilation pipeline.
  * Implements spec/07_IR_SPEC.md Â§5 (IR Validation Rules).
  *
  * Checks:

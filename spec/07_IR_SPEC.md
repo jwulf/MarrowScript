@@ -1,8 +1,8 @@
-# BoneScript Intermediate Representation Specification
+# MarrowScript Intermediate Representation Specification
 
 ## 1. Purpose
 
-The IR is the **canonical internal form** of a compiled BoneScript program.
+The IR is the **canonical internal form** of a compiled MarrowScript program.
 It sits between the high-level semantic model and target code generation.
 
 Properties:

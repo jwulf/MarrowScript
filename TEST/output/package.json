@@ -1,0 +1,38 @@
+{
+  "name": "marrow_forge",
+  "version": "1.0.0",
+  "private": true,
+  "scripts": {
+    "build": "tsc",
+    "start": "node dist/index.js",
+    "dev": "npx concurrently -n api,ui -c blue,magenta \"npx ts-node src/index.ts\" \"npm run --prefix ../ui dev\"",
+    "dev:api": "ts-node src/index.ts",
+    "migrate": "ts-node src/migrate.ts"
+  },
+  "dependencies": {
+    "express": "4.22.2",
+    "pg": "8.13.1",
+    "ioredis": "5.4.1",
+    "ws": "8.18.0",
+    "uuid": "10.0.0",
+    "cors": "2.8.5",
+    "helmet": "8.0.0",
+    "express-rate-limit": "7.5.0",
+    "jsonwebtoken": "9.0.2",
+    "dotenv": "16.4.7",
+    "node-cron": "3.0.3",
+    "zod": "3.23.8"
+  },
+  "devDependencies": {
+    "@types/express": "4.17.21",
+    "@types/node": "20.14.0",
+    "@types/pg": "8.11.10",
+    "@types/ws": "8.5.13",
+    "@types/cors": "2.8.17",
+    "@types/jsonwebtoken": "9.0.7",
+    "@types/uuid": "10.0.0",
+    "@types/node-cron": "3.0.11",
+    "typescript": "5.6.3",
+    "ts-node": "10.9.2"
+  }
+}

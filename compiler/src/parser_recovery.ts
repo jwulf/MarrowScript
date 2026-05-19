@@ -34,6 +34,7 @@ const SYNC_POINTS = new Set([
   TokenKind.KwConstraint,
   TokenKind.KwPolicy,
   TokenKind.KwFlow,
+  TokenKind.KwStep,
   TokenKind.KwImport,
   TokenKind.KwExtensionPoint,
   // Cognition Layer (LLM Harness, Phase 1)

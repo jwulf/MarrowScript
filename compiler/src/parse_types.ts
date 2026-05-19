@@ -1,5 +1,5 @@
 /**
- * BoneScript Type Expression Parser
+ * MarrowScript Type Expression Parser
  */
 
 import { TokenKind } from "./lexer";

@@ -1,5 +1,5 @@
 /**
- * BoneScript Expression Parser â€” Pratt-style precedence climbing.
+ * MarrowScript Expression Parser â€” Pratt-style precedence climbing.
  */
 
 import { TokenKind } from "./lexer";

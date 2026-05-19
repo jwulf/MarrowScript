@@ -1,5 +1,5 @@
 /**
- * BoneScript Postman Collection Emitter
+ * MarrowScript Postman Collection Emitter
  * Generates a Postman Collection v2.1 JSON from an IRSystem.
  */
 
