@@ -104,7 +104,7 @@ Rules:
 - policy sets rate_limit, audit, encryption
 ```
 
-Then paste in the shop example above so the model understands the syntax. Most frontier models (GPT-4o, Claude Sonnet, Gemini 1.5 Pro) produce valid `.marrow` files on the first or second try.
+Then paste in the shop example above so the model understands the syntax. Most frontier models produce valid `.marrow` files on the first or second try.
 
 ### Using reflect-llm to convert existing code
 
