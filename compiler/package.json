@@ -1,7 +1,6 @@
 {
   "name": "marrowscript-compiler",
   "version": "0.8.1",
-  "private": true,
   "description": "MarrowScript compiler — compile .marrow system descriptions into complete, runnable Node.js backends",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
@@ -36,7 +35,7 @@
     "express",
     "dsl"
   ],
-  "license": "MIT",
+  "license": "SEE LICENSE IN LICENSE",
   "engines": {
     "node": ">=18.0.0"
   },

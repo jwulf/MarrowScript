@@ -327,10 +327,9 @@ function runInit(args: string[]) {
 function runCompile(source: string, resolved: string, extraArgs: string[] = []) {
   // Parse --target flag (default: express)
   let target: "express" | "nakama" | "prisma" | "sqlite" = "express";
-  // Parse optional feature flags (future enhancement — documented for now)
-  let _noSdk = false;
-  let _noOpenApi = false;
-  let _noSeed = false;
+  let noSdk = false;
+  let noOpenApi = false;
+  let noSeed = false;
   for (let i = 0; i < extraArgs.length; i++) {
     if (extraArgs[i] === "--target" && extraArgs[i + 1]) {
       const t = extraArgs[i + 1];
@@ -341,16 +340,16 @@ function runCompile(source: string, resolved: string, extraArgs: string[] = []) 
       target = t;
       i++;
     } else if (extraArgs[i] === "--no-sdk") {
-      _noSdk = true;
+      noSdk = true;
     } else if (extraArgs[i] === "--no-openapi") {
-      _noOpenApi = true;
+      noOpenApi = true;
     } else if (extraArgs[i] === "--no-seed") {
-      _noSeed = true;
+      noSeed = true;
     }
   }
 
   if (target === "nakama") {
-    if (_noSdk || _noOpenApi || _noSeed) {
+    if (noSdk || noOpenApi || noSeed) {
       console.error(`The --no-sdk, --no-openapi, and --no-seed flags only apply to --target express. Ignoring.`);
     }
     runCompileNakama(source, resolved);
@@ -358,7 +357,7 @@ function runCompile(source: string, resolved: string, extraArgs: string[] = []) 
   }
 
   if (target === "prisma") {
-    if (_noSdk || _noOpenApi || _noSeed) {
+    if (noSdk || noOpenApi || noSeed) {
       console.error(`The --no-sdk, --no-openapi, and --no-seed flags only apply to --target express. Ignoring.`);
     }
     runCompilePrisma(source, resolved);
@@ -366,7 +365,7 @@ function runCompile(source: string, resolved: string, extraArgs: string[] = []) 
   }
 
   if (target === "sqlite") {
-    if (_noSdk || _noOpenApi || _noSeed) {
+    if (noSdk || noOpenApi || noSeed) {
       console.error(`The --no-sdk, --no-openapi, and --no-seed flags only apply to --target express. Ignoring.`);
     }
     runCompileSqlite(source, resolved);
@@ -460,7 +459,7 @@ function runCompile(source: string, resolved: string, extraArgs: string[] = []) 
     const emitter = new FullEmitter();
     const allFiles: ReturnType<typeof emitter.emit> = [];
     for (const sys of irSystems) {
-      const files = emitter.emit(sys, { noSdk: _noSdk, noOpenApi: _noOpenApi, noSeed: _noSeed });
+      const files = emitter.emit(sys, { noSdk, noOpenApi, noSeed });
       allFiles.push(...files);
     }
     console.log(`  [6/7] Code emit: ${allFiles.length} files generated`);

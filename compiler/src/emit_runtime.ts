@@ -218,6 +218,7 @@ export function authMiddleware(req: Request, res: Response, next: NextFunction):
 
 export function requireAuth(req: Request, res: Response, next: NextFunction): void {
   // AUTH_DISABLED=1 bypasses all auth checks — for local-only development.
+  // In production this flag is rejected at startup to prevent accidental deploy.
   if (process.env.AUTH_DISABLED === "1") { next(); return; }
   const auth: AuthContext = (req as any).auth;
   if (!auth || !auth.authenticated) {
@@ -688,6 +689,16 @@ export function emitIndex(system: IR.IRSystem): string {
   lines.push(`import { logger } from "./logger";`);
   lines.push(`import { eventBus } from "./events";`);
   lines.push(`import { pool } from "./db";`);
+  lines.push(``);
+  lines.push(`// Refuse to start in production with AUTH_DISABLED — this flag is dev-only.`);
+  lines.push(`if (process.env.AUTH_DISABLED === "1" && process.env.NODE_ENV === "production") {`);
+  lines.push(`  console.error("[FATAL] AUTH_DISABLED=1 is not permitted in production. Remove this flag.");`);
+  lines.push(`  process.exit(1);`);
+  lines.push(`}`);
+  lines.push(`if (process.env.AUTH_DISABLED === "1") {`);
+  lines.push(`  console.warn("[WARN] AUTH_DISABLED=1 is set — all auth checks are bypassed. Do not use in production.");`);
+  lines.push(`}`);
+  lines.push(``);
 
   // Import batch worker if any batch capabilities exist
   const hasBatch = system.modules.some(m =>
