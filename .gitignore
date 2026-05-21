@@ -79,7 +79,7 @@ Playground/
 # --- Internal IDE/tool databases (not part of the project source) -----------
 .code-graph/
 .memory/
-.kiro/settings/
+.kiro/
 
 # --- Logs --------------------------------------------------------------------
 *.log
