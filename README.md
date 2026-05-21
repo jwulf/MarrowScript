@@ -649,6 +649,13 @@ Gives you syntax highlighting, real-time error diagnostics, completions, hover d
 
 ---
 
+## Links
+
+- **npm**: [npmjs.com/package/marrowscript-compiler](https://www.npmjs.com/package/marrowscript-compiler)
+- **GitHub**: [github.com/Doorman11991/MarrowScript](https://github.com/Doorman11991/MarrowScript)
+
+---
+
 ## License
 
 Copyright (c) 2026 ExoCode. All rights reserved.
