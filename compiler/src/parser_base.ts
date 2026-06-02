@@ -38,6 +38,11 @@ export class TokenStream {
     this.loopGuard = 0;
   }
 
+  /** Current position in the token stream (used to detect lack of progress during error recovery) */
+  position(): number {
+    return this.pos;
+  }
+
   peek(offset: number = 0): Token {
     return this.tokens[this.pos + offset] ?? this.tokens[this.tokens.length - 1];
   }

@@ -57,6 +57,7 @@ export class RecoveringParser {
     const systems: AST.SystemDeclNode[] = [];
 
     while (!this.s.check(TokenKind.EOF)) {
+      const before = this.s.position();
       try {
         systems.push(this.parseSystemDecl());
       } catch (e) {
@@ -66,6 +67,11 @@ export class RecoveringParser {
         } else {
           throw e;
         }
+      }
+      // Guarantee forward progress: if neither parsing nor synchronization
+      // consumed a token, skip one to avoid an infinite recovery loop.
+      if (this.s.position() === before && !this.s.check(TokenKind.EOF)) {
+        this.s.advance();
       }
     }
 
@@ -107,6 +113,7 @@ export class RecoveringParser {
 
     const declarations: AST.DeclarationNode[] = [];
     while (!this.s.check(TokenKind.RBrace) && !this.s.check(TokenKind.EOF)) {
+      const before = this.s.position();
       try {
         declarations.push(this.parseDeclaration());
       } catch (e) {
@@ -116,6 +123,15 @@ export class RecoveringParser {
         } else {
           throw e;
         }
+      }
+      // Guarantee forward progress to avoid an infinite recovery loop when
+      // synchronization lands on a token the body loop cannot consume.
+      if (
+        this.s.position() === before &&
+        !this.s.check(TokenKind.RBrace) &&
+        !this.s.check(TokenKind.EOF)
+      ) {
+        this.s.advance();
       }
     }
 
