@@ -6,12 +6,12 @@
 import { createHash } from "crypto";
 import * as path from "path";
 import * as fs from "fs";
-import { Lexer } from "../lexer";
-import { Parser } from "../parser";
-import { TypeChecker } from "../typechecker";
-import { Lowering } from "../lowering";
-import { NakamaEmitter } from "../emit_nakama";
-import { FullEmitter } from "../emit_full";
+import { Lexer } from "../../lexer";
+import { Parser } from "../../parser";
+import { TypeChecker } from "../../typechecker";
+import { Lowering } from "../../lowering";
+import { NakamaEmitter } from "../../emit_nakama";
+import { FullEmitter } from "../../emit_full";
 
 // ─── Test harness ─────────────────────────────────────────────────────────────
 
@@ -114,7 +114,7 @@ system Arena {
 `;
 
 const INVENTORY_EXAMPLE = fs.readFileSync(
-  path.resolve(__dirname, "../../examples/inventory_platform.marrow"), "utf-8"
+  path.resolve(__dirname, "../../../../examples/inventory_platform.marrow"), "utf-8"
 );
 
 // ─── Test 1: Required files are emitted ───────────────────────────────────────

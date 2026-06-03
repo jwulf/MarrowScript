@@ -12,8 +12,8 @@ import * as fs from "fs";
 import * as path from "path";
 import * as os from "os";
 import { execSync } from "child_process";
-import { emitReactHooks } from "../emit_react";
-import * as IR from "../ir";
+import { emitReactHooks } from "../../emit_react";
+import * as IR from "../../ir";
 
 let passed = 0;
 let failed = 0;

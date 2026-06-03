@@ -14,12 +14,12 @@ import * as fs from "fs";
 import * as path from "path";
 import * as os from "os";
 import { execSync, spawn, ChildProcess } from "child_process";
-import { Lexer } from "../lexer";
-import { Parser } from "../parser";
-import { Lowering } from "../lowering";
-import { ConstraintSolver } from "../solver";
-import { optimize } from "../optimizer";
-import { SqliteEmitter } from "../emit_sqlite";
+import { Lexer } from "../../lexer";
+import { Parser } from "../../parser";
+import { Lowering } from "../../lowering";
+import { ConstraintSolver } from "../../solver";
+import { optimize } from "../../optimizer";
+import { SqliteEmitter } from "../../emit_sqlite";
 import { createHash } from "crypto";
 
 let passed = 0;
