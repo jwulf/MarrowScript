@@ -9,8 +9,8 @@
  *   - sendWebhook posts to NOTIFY_WEBHOOK_URL with the right shape
  */
 
-import { emitNotifyService } from "../emit_notify";
-import * as IR from "../ir";
+import { emitNotifyService } from "../../emit_notify";
+import * as IR from "../../ir";
 import * as http from "http";
 import * as fs from "fs";
 import * as path from "path";

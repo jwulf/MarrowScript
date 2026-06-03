@@ -16,10 +16,10 @@ import * as path from "path";
 import * as os from "os";
 import { execSync } from "child_process";
 import { createHash } from "crypto";
-import { Lexer } from "../lexer";
-import { Parser } from "../parser";
-import { Lowering } from "../lowering";
-import { SqliteEmitter } from "../emit_sqlite";
+import { Lexer } from "../../lexer";
+import { Parser } from "../../parser";
+import { Lowering } from "../../lowering";
+import { SqliteEmitter } from "../../emit_sqlite";
 
 const SAMPLE = `
 system TestStore {
@@ -76,14 +76,14 @@ function run(): void {
   // 3. Run migrations against an actual sqlite db
   // We do this by directly using better-sqlite3 from the compiler's node_modules
   // (it's already a transitive dep of ts-node tooling) — install only if missing.
-  const compilerNodeModules = path.resolve(__dirname, "..", "node_modules");
+  const compilerNodeModules = path.resolve(__dirname, "..", "..", "..", "node_modules");
   const sqliteModule = path.join(compilerNodeModules, "better-sqlite3");
 
   if (!fs.existsSync(sqliteModule)) {
     console.log("\n  (installing better-sqlite3 — first run only)");
     try {
       execSync("npm install better-sqlite3@11.5.0 --no-save", {
-        cwd: path.resolve(__dirname, ".."),
+        cwd: path.resolve(__dirname, "..", "..", ".."),
         stdio: "pipe",
       });
     } catch (e) {

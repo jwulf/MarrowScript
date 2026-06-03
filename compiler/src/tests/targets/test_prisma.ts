@@ -10,10 +10,10 @@ import * as fs from "fs";
 import * as path from "path";
 import * as os from "os";
 import { execSync } from "child_process";
-import { Lexer } from "../lexer";
-import { Parser } from "../parser";
-import { Lowering } from "../lowering";
-import { PrismaEmitter } from "../emit_prisma";
+import { Lexer } from "../../lexer";
+import { Parser } from "../../parser";
+import { Lowering } from "../../lowering";
+import { PrismaEmitter } from "../../emit_prisma";
 import { createHash } from "crypto";
 
 let passed = 0;
