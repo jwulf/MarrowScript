@@ -42,6 +42,7 @@ export enum TokenKind {
   MinusEq = "MinusEq",
   AppendEq = "AppendEq",
   Question = "Question",
+  NullCoalesce = "NullCoalesce",
   Bang = "Bang",
 
   // Literals
@@ -703,6 +704,10 @@ export class Lexer {
     if (ch === "." && this.peekAt(1) === ".") {
       this.advance(); this.advance();
       return { kind: TokenKind.DotDot, value: "..", loc };
+    }
+    if (ch === "?" && this.peekAt(1) === "?") {
+      this.advance(); this.advance();
+      return { kind: TokenKind.NullCoalesce, value: "??", loc };
     }
 
     // Single-character operators

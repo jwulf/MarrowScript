@@ -325,6 +325,9 @@ export class TypeChecker {
     if (entitySym) {
       const ctx = new TypeContext(entitySym.type.fields, this.symbols);
       for (const constraint of decl.constraints) {
+        if (this.exprUsesNullCoalesce(constraint)) {
+          this.addError("T013", "The '??' operator is not allowed in entity constraints (constraints compile to SQL)", constraint.loc);
+        }
         const ctype = this.inferExprType(constraint, ctx);
         if (ctype && ctype.tag !== "primitive") {
           this.addError("T005", `Constraint expression must type to bool, got ${typeToString(ctype)}`, constraint.loc);
@@ -522,9 +525,33 @@ export class TypeChecker {
   private checkConstraint(decl: AST.ConstraintDeclNode) {
     // Top-level constraints are checked in a global context
     const globalCtx = new TypeContext(new Map(), this.symbols);
+    if (this.exprUsesNullCoalesce(decl.expr)) {
+      this.addError("T013", `The '??' operator is not allowed in constraint '${decl.name}' (constraints compile to SQL)`, decl.loc);
+    }
     const ctype = this.inferExprType(decl.expr, globalCtx);
     if (ctype && !this.isBoolish(ctype)) {
       this.addError("T005", `Top-level constraint '${decl.name}' must type to bool`, decl.loc);
+    }
+  }
+
+  /** Recursively detect the null-coalescing operator anywhere in an expression. */
+  private exprUsesNullCoalesce(expr: AST.ExprNode): boolean {
+    switch (expr.kind) {
+      case "BinaryExpr":
+        return expr.op === "??" || this.exprUsesNullCoalesce(expr.left) || this.exprUsesNullCoalesce(expr.right);
+      case "UnaryExpr":
+        return this.exprUsesNullCoalesce(expr.operand);
+      case "CallExpr":
+        return expr.args.some(a => this.exprUsesNullCoalesce(a));
+      case "TernaryExpr":
+        return this.exprUsesNullCoalesce(expr.condition) || this.exprUsesNullCoalesce(expr.consequent) || this.exprUsesNullCoalesce(expr.alternate);
+      case "Literal":
+        if (expr.type === "list" && Array.isArray(expr.value)) {
+          return (expr.value as AST.ExprNode[]).some(e => this.exprUsesNullCoalesce(e));
+        }
+        return false;
+      default:
+        return false;
     }
   }
 
@@ -650,6 +677,13 @@ export class TypeChecker {
 
       case "-":
         return prim("int"); // subtraction may produce negative
+
+      // Null-coalescing: `a ?? b` yields the unwrapped (non-optional) type
+      case "??": {
+        const unwrap = (t: CVType | null): CVType | null =>
+          t && t.tag === "generic" && t.name === "optional" ? t.args[0] : t;
+        return unwrap(left) ?? unwrap(right) ?? prim("json");
+      }
 
       default:
         return prim("bool");
