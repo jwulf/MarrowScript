@@ -125,6 +125,39 @@ system BadEmit {
 }
 `, "T011");
 
+// ─── Null-coalescing operator (??) ───────────────────────────────────────────
+
+expect("?? allowed in capability effects", `
+system NCOk {
+  entity Product {
+    owns: [title: string]
+  }
+  capability update_product(p: Product, title: optional<string>) {
+    requires: [p.title != ""]
+    effects: [p.title = title ?? p.title]
+    sync: eventual
+  }
+}
+`, null);
+
+expect("T013: ?? rejected in entity constraint", `
+system NCBadEntity {
+  entity Product {
+    owns: [price_cents: optional<uint>]
+    constraints: [(price_cents ?? 0) > 0]
+  }
+}
+`, "T013");
+
+expect("T013: ?? rejected in top-level constraint", `
+system NCBadTop {
+  entity Product {
+    owns: [price_cents: optional<uint>]
+  }
+  constraint nonneg: (Product.price_cents ?? 0) >= 0
+}
+`, "T013");
+
 // â”€â”€â”€ Summary â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 console.log(`\nâ•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•`);

@@ -7,7 +7,7 @@ import { TokenStream, ParseError } from "./parser_base";
 import * as AST from "./ast";
 
 export function parseExpr(s: TokenStream): AST.ExprNode {
-  return parseLogicalOr(s);
+  return parseNullCoalesce(s);
 }
 
 export function parseExprList(s: TokenStream): AST.ExprNode[] {
@@ -17,6 +17,17 @@ export function parseExprList(s: TokenStream): AST.ExprNode[] {
     exprs.push(parseExpr(s));
   } while (s.match(TokenKind.Comma));
   return exprs;
+}
+
+function parseNullCoalesce(s: TokenStream): AST.ExprNode {
+  let left = parseLogicalOr(s);
+  while (s.check(TokenKind.NullCoalesce)) {
+    const loc = s.peek().loc;
+    s.advance();
+    const right = parseLogicalOr(s);
+    left = { kind: "BinaryExpr", loc, op: "??", left, right };
+  }
+  return left;
 }
 
 function parseLogicalOr(s: TokenStream): AST.ExprNode {

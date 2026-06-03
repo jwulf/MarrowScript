@@ -41,7 +41,7 @@ function parseExprStr(s: string): Expr {
   }
 
   // Binary operators (check in precedence order, right-to-left to handle left-assoc)
-  const binOps = [" or ", " and ", " == ", " != ", " >= ", " <= ", " > ", " < ", " in ", " contains ", " + ", " - ", " * ", " / "];
+  const binOps = [" ?? ", " or ", " and ", " == ", " != ", " >= ", " <= ", " > ", " < ", " in ", " contains ", " + ", " - ", " * ", " / "];
   for (const op of binOps) {
     const idx = findBinOp(s, op);
     if (idx !== -1) {
@@ -198,6 +198,7 @@ function exprToTsInner(expr: Expr): string {
         case "or": return `(${l} || ${r})`;
         case "in": return `[${r}].flat().includes(${l})`;
         case "contains": return `${l}?.includes(${r})`;
+        case "??": return `(${l} ?? ${r})`;
         case ">": case "<": case ">=": case "<=":
         case "+": case "-": case "*": case "/":
           return `${l} ${expr.op} ${r}`;
